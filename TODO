@@ -1,0 +1,1 @@
+- I duplicate a lot of code (logging, conf parsing, etc.) from AIF-NG. I should probably just create a common library.
