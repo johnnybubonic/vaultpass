@@ -200,7 +200,7 @@ class LocalFile(Config):
 
 class RemoteFile(Config):
     def __init__(self, uri, xsd_path = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(xsd_path = xsd_path, *args, **kwargs)
         self.type = 'remote'
         self.source = uri
 
@@ -216,7 +216,7 @@ class RemoteFile(Config):
 
 class ConfigStr(Config):
     def __init__(self, rawxml, xsd_path = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(xsd_path = xsd_path, *args, **kwargs)
         self.type = 'raw_str'
         self.source = rawxml
 
@@ -228,7 +228,7 @@ class ConfigStr(Config):
 
 class ConfigBin(Config):
     def __init__(self, rawbinaryxml, xsd_path = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__(xsd_path = xsd_path, *args, **kwargs)
         self.type = 'raw_bin'
         self.source = rawbinaryxml
 
