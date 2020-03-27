@@ -3,7 +3,7 @@
            xmlns="https://git.square-r00t.net/VaultPass/"
            xsi:schemaLocation="https://git.square-r00t.net/VaultPass/ http://schema.xml.r00t2.io/projects/vaultpass.xsd"
            autoUnseal="true"
-           unsealShard="YOUR_UNSEAL_HERE">
+           unsealShard="WU9VUiBVTlNFQUwgU0hBUkQgSEVSRQo=">
     <uri>https://localhost:8000/</uri>
     <auth>
         <token/>

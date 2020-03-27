@@ -8,7 +8,7 @@ from lxml import etree
 
 
 # TODO: change filehandler of logger? https://stackoverflow.com/a/47447444
-_logger = logging.getLogger('config:{0}'.format(__name__))
+_logger = logging.getLogger()
 
 
 class Config(object):

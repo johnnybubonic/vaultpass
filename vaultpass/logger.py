@@ -17,6 +17,10 @@ def prepLogfile(path = logfile):
     path = os.path.abspath(os.path.expanduser(path))
     # Set up the permissions beforehand.
     os.makedirs(os.path.dirname(logfile), exist_ok = True, mode = 0o0700)
+    if not os.path.isfile(path):
+        # "Touch" it so the next command doesn't fail.
+        with open(path, 'w') as fh:
+            fh.write('')
     os.chmod(logfile, 0o0600)
     return(path)
 
@@ -49,6 +53,6 @@ h.setFormatter(logging.Formatter(style = '{',
 _cfg_args['handlers'].append(h)
 
 logging.basicConfig(**_cfg_args)
-logger = logging.getLogger()
+logger = logging.getLogger('VaultPass')
 
 logger.info('Logging initialized.')
