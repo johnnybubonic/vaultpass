@@ -1,0 +1,26 @@
+.*.swp
+/.idea
+*.pkg.tar.xz
+pkg/
+*.tar
+*.tar.bz2
+*.tar.xz
+*.tar.gz
+*.tgz
+*.txz
+*.tbz
+*.tbz2
+*.zip
+*.run
+*.7z
+*.rar
+# We might want to allow .jars?
+*.jar
+*.deb
+test.py
+__pycache__/
+target/
+test-output/
+logs/
+ldap.pass
+ldaprc
