@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <vaultpass xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
            xmlns="https://git.square-r00t.net/VaultPass/"
-           xsi:schemaLocation="https://git.square-r00t.net/VaultPass/ http://schema.xml.r00t2.io/projects/vaultpass.xsd"
-           autoUnseal="true"
-           unsealShard="WU9VUiBVTlNFQUwgU0hBUkQgSEVSRQo=">
-    <uri>https://localhost:8000/</uri>
-    <auth>
-        <token/>
-    </auth>
+           xsi:schemaLocation="https://git.square-r00t.net/VaultPass/ http://schema.xml.r00t2.io/projects/vaultpass.xsd">
+    <server>
+        <!-- Optional; defaults to http://localhost:8000/ -->
+        <uri>http://localhost:8000/</uri>
+        <!-- OPTIONAL! If an unseal shard is provided and the server is sealed, we will attempt
+             unsealing with the shard(s) provided. -->
+        <unseal>WU9VUiBVTlNFQUwgU0hBUkQgSEVSRQo=</unseal>
+    </server>
+    <authGpg>~/.vaultcreds.xml.gpg</authGpg>
 </vaultpass>

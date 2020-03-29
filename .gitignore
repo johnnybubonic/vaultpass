@@ -19,8 +19,5 @@ pkg/
 *.deb
 test.py
 __pycache__/
-target/
-test-output/
 logs/
-ldap.pass
-ldaprc
+docs/README.html
