@@ -29,7 +29,7 @@ class PassMan(object):
     def getClient(self):
         # This may need to be re-tooled in the future.
         auth_xml = self.cfg.xml.find('auth')
-        authmethod_xml = auth_xml.getchildren()[0]\
+        authmethod_xml = auth_xml.getchildren()[0]
         for a in dir(auth):
             if a.startswith('_'):
                 continue

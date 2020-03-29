@@ -1,0 +1,341 @@
+= VaultPass User Manual
+Brent Saner <bts@square-r00t.net>
+v1.0, 2020-03-28
+:doctype: book
+:data-uri:
+:imagesdir: images
+:sectlinks:
+:toc: preamble
+:toc2: left
+:idprefix:
+:toclevels: 7
+:source-highlighter: highlightjs
+
+== Preface
+=== What is Vault?
+https://www.vaultproject.io/[Vault by HashiCorp^] is a "secrets manager" - it securely protects various secrets with a
+very robust system of authentication and authorization.
+
+It also provides an https://en.wikipedia.org/wiki/X.509[X.509^] https://en.wikipedia.org/wiki/Public_key_infrastructure[PKI^]
+system for certificates generation and a token/OTP generator.
+
+=== What is Pass?
+https://www.passwordstore.org/[Pass^] ("The standard Unix password manager") is a password manager written entirely in
+bash and backed by GPG. It's fairly barebones in terms of technology but does a decent enough job.
+
+=== What is VaultPass?
+VaultPass attempts to bridge the gap between the two. It aims to be a drop-in replacement for the pass CLI utility via
+subcommands and other operations, but obviously with Vault as a backend instead of GPG-encrypted flatfile hierarchy.
+
+Obviously since the backends are vastly different, total parity is going to be impossible. But I try to get it pretty close.
+
+
+== Configuration
+Unlike Pass, PassVault requires a persistent configuration. At the very **least**, the authentication method needs to be
+specified.
+
+The default location for the configuration file is `~/.config/vaultpass.xml`. It's an XML document formatted with the
+following structure:
+
+. The https://www.w3.org/TR/xml/#sec-prolog-dtd[XML prolog^], specifying the character encoding of the document and
+XML version.footnote:confheader[These aren't **strictly** necessary, but will make cross-parsing and validation MUCH
+easier. It's *highly* recommended to use them.]
+. The root element (`vaultpass`).
+This element contains attributes describing parsing/validation specifics as well, such as the
+https://www.w3.org/TR/xml-names/[namespace definitions^] and https://www.w3.org/TR/xmlschema11-1/#xsi_schemaLocation[schema location^].footnote:confheader[]
+.. The `server` element.footnote:optelem[This element/attribute/text content is *optional*. See the item's description
+for how default values/behaviour are determined.] This element is a container for connection and management of the
+Vault server. This consists of:
+... A single `uri` element.footnote:optelem[] It should be the same as the **base** URL for your Vault server.
+The default (if not specified) is to first check for a **`VAULT_SERVER`** environment variable and, if not found, to use
+`http://localhost:8000/`.
+... An unseal directive, which can be used to (attempt to) automatically unseal the server if it is sealed.
+This isn't required, but can assist in automatic operation.
+One of either:footnote:optelem[]
+.... `unseal`, the unseal key shard (a Base64 string), or
+.... `unsealGpg`, the unseal key shard encrypted with GPG. See the section on <<GPG-Encrypted Elements>>.
+... A required authentication directive which specifies how we should authenticate to Vault. It should be comprised of
+one of either:
+.... `auth` (see <<Auth>> section below), or
+.... `authGpg`, an <<Auth>> config snippet encrypted with GPG. See the section on <<GPG-Encrypted Elements>>.
+
+Let's look at an example configuration.
+
+=== Example Configuration
+
+.`~/.config/vaultpass.xml` example:
+[source,xml]
+----
+<?xml version="1.0" encoding="UTF-8" ?>
+<vaultpass xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns="https://git.square-r00t.net/VaultPass/"
+           xsi:schemaLocation="https://git.square-r00t.net/VaultPass/ http://schema.xml.r00t2.io/projects/vaultpass.xsd">
+
+    <server>
+        <uri>http://localhost:8000/</uri>
+        <unseal>YOUR_UNSEAL_SHARD</unseal>
+    </server>
+    <auth>
+        <token/>
+    </auth>
+
+</vaultpass>
+----
+
+In the above, we can see that it would use the vault server at `http://localhost:8000/` using whatever token is either
+in the **`VAULT_TOKEN`** environment variable or, if empty, the `~/.vault-token` file. Because an unseal shard was
+provided, it will be able to attempt to automatically unseal the Vault (assuming its shard will complete the threshold
+needed).
+
+=== Auth
+Vault itself supports a https://www.vaultproject.io/docs/auth/[large number of authentication methods^]. However, in
+the interest if maintainability, this project has limited support to only the most common authentication methods. More
+authentication methods may be added in the future upon request.
+
+NOTE: All of these (except for <<token>>) **require** configuration in Vault first. Configuration of those
+authentication methods is out of scope for this document and project. Please ensure that your authentication works as
+expected in the https://www.vaultproject.io/downloads/[Vault CLI utility^] or via the
+https://www.vaultproject.io/api-docs/auth/[Vault API^] first before submitting a bug report in VaultPass.
+
+==== AppRole
+AppRole takes two required children elements:
+
+. `appRole` (the container element)
+.. `role`, the AppRole's RoleID, and
+.. `secret`, the AppRole's SecretID.
+
+===== Example Snippet
+[source,xml]
+----
+<!-- SNIP -->
+    <auth>
+        <appRole>
+            <role>my-role</role>
+            <secret>37b74931-c4cd-d49a-9246-ccc62d682a25</secret>
+        </appRole>
+    </auth>
+<!-- SNIP -->
+----
+
+==== LDAP
+LDAP takes two required children elements and one optional child element:
+
+. `ldap` (the container element)
+.. `username`, the username (as according to the *`userdn`* and *`userattr`* settings
+https://www.vaultproject.io/docs/auth/ldap/#binding-parameters[in the configuration^])
+.. `password`, the password for the account object.
+.. `mountPoint` footnote:optelem[], the https://www.vaultproject.io/api-docs/system/mounts/[mount point^] for the LDAP authentication in
+Vault. The default, if not provided, is `ldap`.
+
+===== Example Snippet
+[source,xml]
+----
+<!-- SNIP -->
+    <auth>
+        <ldap>
+            <username>mitchellh</username>
+            <password>MyPassword1</password>
+            <mountPoint>ldap</mountPoint>
+        </ldap>
+    </auth>
+<!-- SNIP -->
+----
+
+==== Token
+Token auth is the most basic supported authentication in Vault and can be used without any further configuration.
+
+It consists of, at its most basic (and "automagic") configuration, a single element -- but this can be configured more
+in-depth/explicitly.
+
+. `token` (the container element)
+.. The token itself or content/source of the token.footnote:optelem[]
+
+It has one optional attribute: `source`.footnote:optelem[]. It can be one of the following:
+
+* `env:MY_TOKEN_VAR`, in which environmental token **`MY_TOKEN_VAR`** will be sourced.
+* A filesystem path, in which the file is assumed to contain the token (and ONLY the token).
+
+To determine the behaviour of how this behaves, please refer to the below table.
+
+.Determining `token` behaviour
+[cols="^1,5,10"]
+|===
+|No. |If... |Then...
+
+| 1 |self-enclosed, no `source` |The **`VAULT_TOKEN`** environment variable is checked. If not defined, the file
+`~/.vault-token` will be checked. If that file doesn't exist, a `RuntimeError` will be raised.
+| 2 |self-enclosed, `source` given| The `source` is assumed to be the *only* source and no automatic detection will occur.
+| 3 |token contained in tags, no `source`| The specified token will be used and no automatic detection will occur.
+| 4 |token contained in tags, `source` given |Same as **3**; `source` is ignored.
+|===
+
+===== Example Snippet
+[source,xml]
+----
+<!-- SNIP -->
+    <auth>
+        <!-- "Automagic" (#1).
+             First $VAULT_TOKEN environment variable is checked, then ~/.vault-token is checked. -->
+        <token/>
+
+        <!-- Source is considered the only place to fetch token from (#2). -->
+            <!-- This would check the environment variable $SOMEVAR -->
+        <!-- <token source="env:SOMEVAR"/> -->
+            <!-- This would use the contents of ~/.vault-token.alt -->
+        <!-- <token source="~/.vault-token.alt"/> -->
+
+        <!-- Token explicitly given is the only one used. -->
+        <!-- <token>s.Lp4ix1CKBtJOfA46Ks4b4cs6</token> -->
+
+        <!-- Token explicitly given is the only one used; source attribute is ignored. -->
+        <!-- <token source="env:THIS_IS_IGNORED">s.Lp4ix1CKBtJOfA46Ks4b4cs6</token> -->
+    </auth>
+<!-- SNIP -->
+----
+
+==== User/Password
+Vault's https://www.vaultproject.io/docs/auth/userpass/[userpass authentication method^] must be
+https://www.vaultproject.io/docs/auth/userpass/#configuration[configured^] beforehand, but it's a relatively simple
+configuration.
+
+VaultPass user/password authentication takes two required children elements and one optional element.
+
+. `userpass` (the container element)
+.. `username`, the username of the account.
+.. `password`, the password for the account.
+.. `mountPoint` footnote:optelem[], the https://www.vaultproject.io/api-docs/system/mounts/[mount point^] for the auth.
+If not specified, the default is `userpass`.
+
+===== Example Snippet
+[source,xml]
+----
+<!-- SNIP -->
+    <auth>
+        <userpass>
+            <username>mitchellh</username>
+            <password>foo</password>
+            <mountPoint>userpass</mountPoint>
+        </userpass>
+    </auth>
+<!-- SNIP -->
+----
+
+=== GPG-Encrypted Elements
+Understandably, in order to have a persistent configuration, that means storing on disk. That also means that they need
+to be able to be accessed with no or minimal user interruption. Pass used GPG natively, so it didn't have an issue with
+this; since https://www.gnupg.org/documentation/manuals/gnupg/Invoking-GPG_002dAGENT.html[gpg-agent^] is typically
+spawned on first use of a https://www.gnupg.org/gph/en/manual/r1616.html[GPG homedir^] (usually `~/.gnupg/` by default)
+and keeps an authenticated session open for 10 minutes
+(https://superuser.com/questions/624343/keep-gnupg-credentials-cached-for-entire-user-session[by default^]).
+
+To get around needing to store plaintext credentials on-disk in any form, VaultPass has `unsealGpg` and `authGpg`
+elements. These elements are of the same composition (described <<gpg_elements, below>>) and allow you to use GPG to
+encrypt that sensitive information.
+
+Note that while this does increase security, it breaks compatibility with other XML parsers - they won't be able to
+decrypt and parse the encrypted snippet unless explicitly coded to do so.
+
+==== `*Gpg` elements
+`*Gpg` elements (`authGpg`, `unsealGpg`) have the same structure:
+
+. `unsealGpg`/`authGpg`, the container element.
+.. The path to the encrypted file as the contained text.
+
+It has some optional attributes as well:
+
+.`*Gpg` element attributes
+|===
+|Attribute |Content
+
+|`keyFPR` footnote:optelem[] | The GPG key to use to decrypt the file. It accepts multiple key ID formats, but it's *highly* recommended to
+use the full 40-character (without spaces) key fingerprint. If not specified, VaultPass will use the first private key
+it finds in the keyring.
+|`gpgHome` footnote:optelem[] | The GPG home directory. If not specified, VaultPass will first check the **`GNUPGHOME`** environment
+variable. If that's empty, we'll default to `~/.gnupg/`.
+|===
+
+The contents of the encrypted file should match the **unencrypted** XML content it's replacing.
+
+CAUTION: Note that if you use namespaces in your `vaultpass.xml` config file, you **MUST** use matching declarations in
+your encrypted file.
+
+Let's look at an example of GPG-encrypted elements.
+
+==== GPG-Encrypted Elements Example
+
+.`~/.config/vaultpass.xml` snippet:
+[source,xml]
+----
+<?xml version="1.0" encoding="UTF-8" ?>
+<vaultpass xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns="https://git.square-r00t.net/VaultPass/"
+           xsi:schemaLocation="https://git.square-r00t.net/VaultPass/ http://schema.xml.r00t2.io/projects/vaultpass.xsd">
+
+    <server>
+        <uri>http://localhost:8000/</uri>
+        <unsealGpg keyFPR="D34DB33FD34DB33FD34DB33FD34DB33FD34DB33F"
+                   gpgHome="~/.gnupg">~/.private/vaultpass/unseal.asc</unsealGpg>
+    </server>
+    <authGpg keyFPR="D34DB33FD34DB33FD34DB33FD34DB33FD34DB33F"
+               gpgHome="~/.gnupg">~/.private/vaultpass/auth.gpg</unsealGpg>
+</vaultpass>
+----
+
+As shown, it supports both <<ascii_armored>> and <<binary>> encryption formats.
+
+==== ASCII-Armored
+===== Encrypted
+.`~/.private/vaultpass/unseal.asc` contents:
+[source]
+----
+-----BEGIN PGP MESSAGE-----
+
+hQIMA7QuYg9nGdZdAQ//eHvEZ7vpLvygM2ofIiT2uW7cWYQaYm/09li7s0+0ZqTu
+hNki7oIQ1Ip+k6ds45eEXPG6hXwZ7+mtIDG8VcYpo0PdwpvcJ9qqAgvnFAynvjgH
+pRkeIw4VUfGxxhs8oZMvdrXuYtwzaXIhn0UuZv+cIS1Jj6IfG0xSpRvd+M0MW+Wk
+IWSIyUcY6fkP7MFEiId7sQwm6htHXJDqiVAmwn4lqk2CnIhtsTd5HUyRzGg5gZs+
+sFAssa7QjoBKJMkTDVH4EIC4GcgNtTB/rg7XBoX1k36CHZAwB/boZ5arMYswwkYp
+VFv9At13vkkRMf23bb7siq7U0Vbvs0PGsFJS/1ivS1IyzFGFZGHaTz7ndk2q2iyY
+tMjMe+z+i2VAGvtfdE7H4K4TrqrM9OZ81vyJkEjRBrkSfR9sWOgv5yBFDvoeVkZl
+k1gRXLkrF/7eZn8vD17oOew/zr+um7s/rTtLp5GEknOsKzb1NOMBHP44dXdxNreT
+HdRlNDLgOp2KffXgNSm/A026tMSA0nf0kpJmR1yLjucKPoy6wVrTMh+sLNubgxmZ
+BCz64myu8dfWtHQfPSis1kjrs15mfQoOu9Cl9st8gTs50sKWTa+dGdajZEcz8rcX
+OMBLwiTQodP/0uRHf8YofIFk86QXbYALd4WsC/KvDQBiaz8HRcfkccDQCHQvdLrS
+wEkBuhCZj1OqUnTXg0qggMD0Hp2pO0CqD4uZ3RHvIt49W+7oUr22Y4VarRNeP06x
+JhYC3Sr0RXv/Vi21DMiUUUAXYeYKP82HpP0zSZhCcwVZZje1dXwq85SH04u9pT+n
+f2JqgATxmAaepQZCANxAluknfSluuCBi0hmhagYY2IsgKmJcSsksm0AWfGyzgoeV
+ZypDlE3MuERVLJSDBjZtfnScy3CeTWWj5vw7Nfm5XEqOuIIbZaTV/qb6i6y4rc6k
+Yx5xYKHeuXJGbrQdVJemcXyDIV5tDw5RtLpO57EwL+uEYgSbN9rO/N2B83QjB7D5
+lCmbJtQcjxG/eJ/SrB2oS47YdEKRy+cH0Xx+
+=scGv
+-----END PGP MESSAGE-----
+----
+
+===== Decrypted
+[source,xml]
+----
+<unseal xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="https://git.square-r00t.net/VaultPass/"
+        xsi:schemaLocation="https://git.square-r00t.net/VaultPass/ http://schema.xml.r00t2.io/projects/vaultpass.xsd">1fs1tV46ebb6awF6edtuzsoEawZlBARFp5rSaED+EJI=</unseal>
+----
+
+==== Binary
+===== Encrypted
+.`~/.private/vaultpass/auth.gpg` contents:
+[source]
+----
+<BINARY DATA>
+----
+
+
+===== Decrypted
+[source,xml]
+----
+<auth xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="https://git.square-r00t.net/VaultPass/"
+        xsi:schemaLocation="https://git.square-r00t.net/VaultPass/ http://schema.xml.r00t2.io/projects/vaultpass.xsd">
+
+    <token>s.Lp4ix1CKBtJOfA46Ks4b4cs6</token>
+
+</auth>
+----

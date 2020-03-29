@@ -128,3 +128,6 @@ class Token(_AuthBase):
                     self.token = self._getEnv(e)
                 else:
                     self.token = self._getFile(a)
+        self.client.token = self.token
+        self.authCheck()
+        return(None)
