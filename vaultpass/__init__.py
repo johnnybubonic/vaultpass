@@ -16,7 +16,6 @@ class PassMan(object):
 
     def __init__(self, cfg = '~/.config/vaultpass.xml'):
         self.cfg = config.getConfig(cfg)
-        self.cfg.main()
         self._getURI()
         self.getClient()
 
@@ -29,6 +28,8 @@ class PassMan(object):
     def getClient(self):
         # This may need to be re-tooled in the future.
         auth_xml = self.cfg.xml.find('auth')
+        if auth_xml is None:
+            raise RuntimeError('Could not find authentication')
         authmethod_xml = auth_xml.getchildren()[0]
         for a in dir(auth):
             if a.startswith('_'):

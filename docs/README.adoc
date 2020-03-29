@@ -175,7 +175,8 @@ To determine the behaviour of how this behaves, please refer to the below table.
 <!-- SNIP -->
     <auth>
         <!-- "Automagic" (#1).
-             First $VAULT_TOKEN environment variable is checked, then ~/.vault-token is checked. -->
+             First $VAULT_TOKEN environment variable is checked,
+             then ~/.vault-token is checked. -->
         <token/>
 
         <!-- Source is considered the only place to fetch token from (#2). -->
@@ -232,8 +233,8 @@ To get around needing to store plaintext credentials on-disk in any form, VaultP
 elements. These elements are of the same composition (described <<gpg_elements, below>>) and allow you to use GPG to
 encrypt that sensitive information.
 
-Note that while this does increase security, it breaks compatibility with other XML parsers - they won't be able to
-decrypt and parse the encrypted snippet unless explicitly coded to do so.
+While this does increase security, it breaks compatibility with other XML parsers - they won't be able to decrypt and
+parse the encrypted snippet unless explicitly coded to do so.
 
 ==== `*Gpg` elements
 `*Gpg` elements (`authGpg`, `unsealGpg`) have the same structure:
@@ -241,23 +242,16 @@ decrypt and parse the encrypted snippet unless explicitly coded to do so.
 . `unsealGpg`/`authGpg`, the container element.
 .. The path to the encrypted file as the contained text.
 
-It has some optional attributes as well:
-
-.`*Gpg` element attributes
-|===
-|Attribute |Content
-
-|`keyFPR` footnote:optelem[] | The GPG key to use to decrypt the file. It accepts multiple key ID formats, but it's *highly* recommended to
-use the full 40-character (without spaces) key fingerprint. If not specified, VaultPass will use the first private key
-it finds in the keyring.
-|`gpgHome` footnote:optelem[] | The GPG home directory. If not specified, VaultPass will first check the **`GNUPGHOME`** environment
-variable. If that's empty, we'll default to `~/.gnupg/`.
-|===
+It has one optional attribute, `gpgHome` footnote:optelem[] -- the GPG home directory to use. If not specified,
+VaultPass will first check the **`GNUPGHOME`** environment variable. If that isn't defined, we'll default to
+`~/.gnupg/` (or whatever the compiled-in default is).
 
 The contents of the encrypted file should match the **unencrypted** XML content it's replacing.
 
 CAUTION: Note that if you use namespaces in your `vaultpass.xml` config file, you **MUST** use matching declarations in
-your encrypted file.
+your encrypted file. You **MAY** exclude the `xsi:schemaLocation` specification, however, if it's the same as your
+`vaultpass.xml`. It is **highly** recommended that you use the same xsi:shemaLocation, however (or leave it out
+entirely).
 
 Let's look at an example of GPG-encrypted elements.
 
@@ -273,11 +267,9 @@ Let's look at an example of GPG-encrypted elements.
 
     <server>
         <uri>http://localhost:8000/</uri>
-        <unsealGpg keyFPR="D34DB33FD34DB33FD34DB33FD34DB33FD34DB33F"
-                   gpgHome="~/.gnupg">~/.private/vaultpass/unseal.asc</unsealGpg>
+        <unsealGpg gpgHome="~/.gnupg">~/.private/vaultpass/unseal.asc</unsealGpg>
     </server>
-    <authGpg keyFPR="D34DB33FD34DB33FD34DB33FD34DB33FD34DB33F"
-               gpgHome="~/.gnupg">~/.private/vaultpass/auth.gpg</unsealGpg>
+    <authGpg gpgHome="~/.gnupg">~/.private/vaultpass/auth.gpg</unsealGpg>
 </vaultpass>
 ----
 

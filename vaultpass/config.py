@@ -3,6 +3,7 @@ import os
 import logging
 import re
 ##
+from . import gpg_handler
 import requests
 from lxml import etree
 
@@ -12,6 +13,8 @@ _logger = logging.getLogger()
 
 
 class Config(object):
+    gpg = None
+    gpg_elems = ('authGpg', 'unsealGpg')
     xsd_path = None
     tree = None
     namespaced_tree = None
@@ -31,6 +34,31 @@ class Config(object):
             self.populateDefaults()
         if validate:
             self.validate()
+        g = self.parseGpg()
+        if g:
+            # And do it again.
+            if populate_defaults:
+                self.populateDefaults()
+            if validate:
+                self.validate()
+        return(None)
+
+    def decryptGpg(self, gpg_xml):
+        home = gpg_xml.attrib.get('gpgHome')
+        tag = gpg_xml.tag
+        ns_xml = self.xml.find(tag)
+        xml = self.stripNS(obj = ns_xml).tag
+        fpath = gpg_xml.text
+        if not self.gpg:
+            self.gpg = gpg_handler.GPG(home = home)
+        else:
+            self.gpg.gpg.home = home
+            self.gpg.initHome()
+        ns_dcrpt_xml = etree.fromstring(self.gpg.decrypt(fpath))
+        dcrpt_xml = self.stripNS(obj = ns_dcrpt_xml)
+        ns_xml.getparent().replace(ns_xml, ns_dcrpt_xml)
+        xml.getparent().replace(xml, dcrpt_xml)
+        self.parse()
         return(None)
 
     def fetch(self):  # Just a fail-safe; this is overridden by specific subclasses.
@@ -87,11 +115,8 @@ class Config(object):
         _logger.info('Rendered XSD.')
         return(None)
 
-    def parseRaw(self, parser = None):
-        self.xml = etree.fromstring(self.raw, parser = parser)
-        _logger.debug('Generated xml.')
-        self.namespaced_xml = etree.fromstring(self.raw, parser = parser)
-        _logger.debug('Generated namespaced xml.')
+    def parse(self):
+        # This can used to "re-parse" the self.xml and self.namespaced_xml.
         self.tree = self.xml.getroottree()
         _logger.debug('Generated tree.')
         self.namespaced_tree = self.namespaced_xml.getroottree()
@@ -101,6 +126,26 @@ class Config(object):
         self.namespaced_tree.xinclude()
         _logger.debug('Parsed XInclude for namespaced tree.')
         self.stripNS()
+        return(None)
+
+    def parseGpg(self):
+        gpg_elem_found = False  # Change to True if we find any GPG-encrypted elems
+        search = []
+        for x in self.gpg_elems:
+            search.append("local-name()='{0}'".format(x))
+        search = '[{0}]'.format(' or '.join(search))
+        print(search)
+        gpg_elems = self.namespaced_xml.findall('|'.join(search))
+        for e in gpg_elems:
+            print(e)
+        return(gpg_elem_found)
+
+    def parseRaw(self, parser = None):
+        self.xml = etree.fromstring(self.raw, parser = parser)
+        _logger.debug('Generated xml.')
+        self.namespaced_xml = etree.fromstring(self.raw, parser = parser)
+        _logger.debug('Generated namespaced xml.')
+        self.parse()
         return(None)
 
     def populateDefaults(self):
