@@ -21,6 +21,7 @@ class _AuthBase(object):
             _logger.debug('Could not authenticate to {0} using {1}.'.format(self.uri, self.name))
             _logger.error('Could not authenticate')
             raise RuntimeError('Could not authenticate')
+        return(None)
 
     def getClient(self):
         pass  # Dummy/placeholder func.
@@ -40,14 +41,18 @@ class _BasicAuthBase(_AuthBase):
         self.setCreds()
 
     def setCreds(self):
-        self.username = self.xml.find('username').text
-        self.password = self.xml.find('password').text
-        _mntpt = self.xml.find('mountPoint')
+        self.username = self.xml.find('.//username').text
+        _logger.debug('Set username: {0}'.format(self.username))
+        self.password = self.xml.find('.//password').text
+        _logger.debug('Set password: {0}'.format(self.password))
+        _mntpt = self.xml.find('.//mountPoint')
         if _mntpt is not None:
             self.mount = _mntpt.text
         else:
             self.mount = self.default_mountpoint
+        _logger.debug('Set mountpoint: {0}'.format(self.mount))
         self.client = hvac.Client(url = self.uri)
+        _logger.info('Initialized client.')
         return(None)
 
 
@@ -62,10 +67,14 @@ class AppRole(_AuthBase):
         self.getClient()
 
     def getClient(self):
-        self.role = self.xml.find('role').text
-        self.secret = self.xml.find('secret').text
+        self.role = self.xml.find('.//role').text
+        _logger.debug('Set role: {0}'.format(self.role))
+        self.secret = self.xml.find('.//secret').text
+        _logger.debug('Set secret: {0}'.format(self.secret))
         self.client = hvac.Client(url = self.uri)
+        _logger.info('Initialized client.')
         self.client.auth_approle(self.role, secret_id = self.secret)
+        _logger.debug('Attempted to authenticate client.')
         self.authCheck()
         return(None)
 
@@ -82,6 +91,7 @@ class LDAP(_BasicAuthBase):
         self.client.auth.ldap.login(username = self.username,
                                     password = self.password,
                                     mount_point = self.mount)
+        _logger.debug('Attempted to authenticate client.')
         self.authCheck()
         return(None)
 
@@ -141,8 +151,11 @@ class Token(_AuthBase):
                     self.token = self._getEnv(e)
                 else:
                     self.token = self._getFile(a)
+        _logger.debug('Set token: {0}'.format(self.token))
         self.client = hvac.Client(url = self.uri)
+        _logger.info('Initialized client.')
         self.client.token = self.token
+        _logger.debug('Applied token.')
         self.authCheck()
         return(None)
 
@@ -156,8 +169,14 @@ class UserPass(_BasicAuthBase):
         self.getClient()
 
     def getClient(self):
-        self.client.auth.userpass.login(username = self.username,
-                                        password = self.password,
-                                        mount_point = self.mount)
+        resp = self.client.auth.userpass.login(username = self.username,
+                                               password = self.password,
+                                               mount_point = self.mount)
+        _logger.debug('Attempted to authenticate client.')
+        try:
+            self.client.token = resp['auth']['client_token']
+        except KeyError:
+            # Auth failed. We'll let authCheck() handle the error.
+            pass
         self.authCheck()
         return(None)

@@ -10,4 +10,12 @@
         <unseal>WU9VUiBVTlNFQUwgU0hBUkQgSEVSRQo=</unseal>
     </server>
     <authGpg>~/.vaultcreds.xml.gpg</authGpg>
+    <!-- Optional, but probably a *very* good idea if you don't have read/list access to /sys/mounts as you won't
+         be able to iterate through available mounts if not. -->
+    <!-- Default type if not specified is kv2. -->
+    <mounts>
+        <mount type="kv">secrets_legacy</mount>
+        <mount type="kv2">secrets</mount>
+        <mount type="cubbyhole">cubbyhole</mount>
+    </mounts>
 </vaultpass>

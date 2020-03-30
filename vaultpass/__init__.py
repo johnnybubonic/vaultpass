@@ -13,12 +13,14 @@ class PassMan(object):
     client = None
     auth = None
     uri = None
+    mount = None
 
     def __init__(self, cfg = '~/.config/vaultpass.xml'):
         self.cfg = config.getConfig(cfg)
         self._getURI()
         self.getClient()
         self._checkSeal()
+        self._getMount()
 
     def _checkSeal(self):
         _logger.debug('Checking and attempting unseal if necessary and possible.')
@@ -37,6 +39,10 @@ class PassMan(object):
             _logger.error('Unable to unseal')
             raise RuntimeError('Unable to unseal')
         return(None)
+
+    def _getMount(self):
+        # TODO: mounts xml?
+        self.mount = mounts.MountHandler(self.client)
 
     def _getURI(self):
         uri = self.cfg.xml.find('.//uri')
