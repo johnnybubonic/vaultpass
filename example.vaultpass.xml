@@ -3,8 +3,8 @@
            xmlns="https://git.square-r00t.net/VaultPass/"
            xsi:schemaLocation="https://git.square-r00t.net/VaultPass/ http://schema.xml.r00t2.io/projects/vaultpass.xsd">
     <server>
-        <!-- Optional; defaults to http://localhost:8000/ -->
-        <uri>http://localhost:8000/</uri>
+        <!-- Optional; defaults to http://localhost:8200/ -->
+        <uri>http://localhost:8200/</uri>
         <!-- OPTIONAL! If an unseal shard is provided and the server is sealed, we will attempt
              unsealing with the shard(s) provided. -->
         <unseal>WU9VUiBVTlNFQUwgU0hBUkQgSEVSRQo=</unseal>

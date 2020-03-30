@@ -48,7 +48,7 @@ for how default values/behaviour are determined.] This element is a container fo
 Vault server. This consists of:
 ... A single `uri` element.footnote:optelem[] It should be the same as the **base** URL for your Vault server.
 The default (if not specified) is to first check for a **`VAULT_SERVER`** environment variable and, if not found, to use
-`http://localhost:8000/`.
+`http://localhost:8200/`.
 ... An unseal directive, which can be used to (attempt to) automatically unseal the server if it is sealed.
 This isn't required, but can assist in automatic operation.
 One of either:footnote:optelem[]
@@ -72,7 +72,7 @@ Let's look at an example configuration.
            xsi:schemaLocation="https://git.square-r00t.net/VaultPass/ http://schema.xml.r00t2.io/projects/vaultpass.xsd">
 
     <server>
-        <uri>http://localhost:8000/</uri>
+        <uri>http://localhost:8200/</uri>
         <unseal>YOUR_UNSEAL_SHARD</unseal>
     </server>
     <auth>
@@ -82,7 +82,7 @@ Let's look at an example configuration.
 </vaultpass>
 ----
 
-In the above, we can see that it would use the vault server at `http://localhost:8000/` using whatever token is either
+In the above, we can see that it would use the vault server at `http://localhost:8200/` using whatever token is either
 in the **`VAULT_TOKEN`** environment variable or, if empty, the `~/.vault-token` file. Because an unseal shard was
 provided, it will be able to attempt to automatically unseal the Vault (assuming its shard will complete the threshold
 needed).
@@ -266,7 +266,7 @@ Let's look at an example of GPG-encrypted elements.
            xsi:schemaLocation="https://git.square-r00t.net/VaultPass/ http://schema.xml.r00t2.io/projects/vaultpass.xsd">
 
     <server>
-        <uri>http://localhost:8000/</uri>
+        <uri>http://localhost:8200/</uri>
         <unsealGpg gpgHome="~/.gnupg">~/.private/vaultpass/unseal.asc</unsealGpg>
     </server>
     <authGpg gpgHome="~/.gnupg">~/.private/vaultpass/auth.gpg</unsealGpg>
