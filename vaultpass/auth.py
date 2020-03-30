@@ -27,6 +27,30 @@ class _AuthBase(object):
         return(None)
 
 
+class _BasicAuthBase(_AuthBase):
+    name = '_BasicAuthBase'
+    client = None
+    username = None
+    password = None
+    mount = None
+
+    def __init__(self, uri, auth_xml, default_mountpoint = 'userpass', *args, **kwargs):
+        super().__init__(uri, auth_xml, *args, **kwargs)
+        self.default_mountpoint = default_mountpoint
+        self.setCreds()
+
+    def setCreds(self):
+        self.username = self.xml.find('username').text
+        self.password = self.xml.find('password').text
+        _mntpt = self.xml.find('mountPoint')
+        if _mntpt is not None:
+            self.mount = _mntpt.text
+        else:
+            self.mount = self.default_mountpoint
+        self.client = hvac.Client(url = self.uri)
+        return(None)
+
+
 class AppRole(_AuthBase):
     name = 'AppRole'
     config_name = 'appRole'
@@ -46,26 +70,15 @@ class AppRole(_AuthBase):
         return(None)
 
 
-class LDAP(_AuthBase):
+class LDAP(_BasicAuthBase):
     name = 'LDAP'
     config_name = 'ldap'
-    username = None
-    password = None
-    mount = None
 
     def __init__(self, uri, auth_xml, *args, **kwargs):
-        super().__init__(uri, auth_xml, *args, **kwargs)
+        super().__init__(uri, auth_xml, default_mountpoint = 'ldap', *args, **kwargs)
         self.getClient()
 
     def getClient(self):
-        self.username = self.xml.find('username').text
-        self.password = self.xml.find('password').text
-        _mntpt = self.xml.find('mountPoint')
-        if _mntpt is not None:
-            self.mount = _mntpt.text
-        else:
-            self.mount = 'ldap'
-        self.client = hvac.Client(url = self.uri)
         self.client.auth.ldap.login(username = self.username,
                                     password = self.password,
                                     mount_point = self.mount)
@@ -130,5 +143,21 @@ class Token(_AuthBase):
                     self.token = self._getFile(a)
         self.client = hvac.Client(url = self.uri)
         self.client.token = self.token
+        self.authCheck()
+        return(None)
+
+
+class UserPass(_BasicAuthBase):
+    name = 'UserPass'
+    config_name = 'userpass'
+
+    def __init__(self, uri, auth_xml, *args, **kwargs):
+        super().__init__(uri, auth_xml, default_mountpoint = 'userpass', *args, **kwargs)
+        self.getClient()
+
+    def getClient(self):
+        self.client.auth.userpass.login(username = self.username,
+                                        password = self.password,
+                                        mount_point = self.mount)
         self.authCheck()
         return(None)
