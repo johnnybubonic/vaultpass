@@ -46,8 +46,10 @@ class Config(object):
     def decryptGpg(self, gpg_xml):
         home = gpg_xml.attrib.get('gpgHome')
         tag = gpg_xml.tag
-        ns_xml = self.xml.find(tag)
-        xml = self.stripNS(obj = ns_xml).tag
+        ns_search = './/{0}'.format(tag)
+        ns_xml = self.namespaced_xml.find(ns_search)
+        search = './/{0}'.format(self.stripNS(obj = ns_xml).tag)
+        xml = self.xml.find(search)
         fpath = gpg_xml.text
         if not self.gpg:
             self.gpg = gpg_handler.GPG(home = home)
@@ -129,15 +131,14 @@ class Config(object):
         return(None)
 
     def parseGpg(self):
-        gpg_elem_found = False  # Change to True if we find any GPG-encrypted elems
+        gpg_elem_found = False
         search = []
         for x in self.gpg_elems:
             search.append("local-name()='{0}'".format(x))
-        search = '[{0}]'.format(' or '.join(search))
-        print(search)
-        gpg_elems = self.namespaced_xml.findall('|'.join(search))
+        search = '//*[{0}]'.format(' or '.join(search))
+        gpg_elems = self.namespaced_xml.xpath(search)
         for e in gpg_elems:
-            print(e)
+            self.decryptGpg(e)
         return(gpg_elem_found)
 
     def parseRaw(self, parser = None):
@@ -166,7 +167,7 @@ class Config(object):
         _logger.debug('Stripping namespace.')
         # https://stackoverflow.com/questions/30232031/how-can-i-strip-namespaces-out-of-an-lxml-tree/30233635#30233635
         xpathq = "descendant-or-self::*[namespace-uri()!='']"
-        if not obj:
+        if obj is None:
             _logger.debug('No XML object selected; using instance\'s xml and tree.')
             for x in (self.tree, self.xml):
                 for e in x.xpath(xpathq):

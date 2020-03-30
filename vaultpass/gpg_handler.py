@@ -13,8 +13,7 @@ class GPG(object):
     gpg = None
 
     def __init__(self, home = None):
-        if home:
-            self.home = home
+        self.home = home
         self.initHome()
 
     def decrypt(self, fpath):
@@ -36,4 +35,5 @@ class GPG(object):
             if not os.path.isdir(self.home):
                 raise ValueError('GPG home does not exist')
             _logger.debug('Set GPG home to explicitly specified value {0}'.format(self.home))
+        self.gpg = gpg.Context(home_dir = self.home)
         return(None)
