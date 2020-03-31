@@ -17,7 +17,7 @@ pkg/
 # We might want to allow .jars?
 *.jar
 *.deb
-test.py
+test*
 __pycache__/
 logs/
 docs/README.html
