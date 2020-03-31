@@ -41,8 +41,9 @@ class PassMan(object):
         return(None)
 
     def _getMount(self):
-        # TODO: mounts xml?
-        self.mount = mounts.MountHandler(self.client)
+        mounts_xml = self.xml.find('.//mounts')
+        self.mount = mounts.MountHandler(self.client, mounts_xml = mounts_xml)
+        return(None)
 
     def _getURI(self):
         uri = self.cfg.xml.find('.//uri')
