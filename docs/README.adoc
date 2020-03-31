@@ -58,6 +58,7 @@ One of either:footnote:optelem[]
 one of either:
 .... `auth` (see <<Auth>> section below), or
 .... `authGpg`, an <<Auth>> config snippet encrypted with GPG. See the section on <<GPG-Encrypted Elements>>.
+... An optional `mounts` container.footnote:optelem[] See the section on <<Mounts>>.
 
 Let's look at an example configuration.
 
@@ -78,6 +79,11 @@ Let's look at an example configuration.
     <auth>
         <token/>
     </auth>
+    <mounts>
+        <mount type="kv1">secret_legacy</mount>
+        <mount type="kv2">secret</mount>
+        <mount type="cubbyhole">cubbyhole</mount>
+    </mounts>
 
 </vaultpass>
 ----
@@ -85,7 +91,7 @@ Let's look at an example configuration.
 In the above, we can see that it would use the vault server at `http://localhost:8200/` using whatever token is either
 in the **`VAULT_TOKEN`** environment variable or, if empty, the `~/.vault-token` file. Because an unseal shard was
 provided, it will be able to attempt to automatically unseal the Vault (assuming its shard will complete the threshold
-needed).
+needed). Because we specify mounts, we do not need permissions in Vault to list `/sys/mounts`.
 
 === Auth
 Vault itself supports a https://www.vaultproject.io/docs/auth/[large number of authentication methods^]. However, in
@@ -221,6 +227,25 @@ If not specified, the default is `userpass`.
 <!-- SNIP -->
 ----
 
+=== Mounts
+VaultPass has the ability to automatically detect (some) mounts and their paths.
+
+So why, then, should you specify them in the configuration file? Simple: because you might not have permission to list
+them! Even if you can see the mounts in the web UI that you have permission to, that **doesn't guarantee** that they're
+accessible/viewable https://www.vaultproject.io/api-docs/[via the API^] (which is how VaultPass, and even the upstream
+Vault binary client, operates). So by specifying them in the configuration file, you're able to "bootstrap" the process.
+
+The optional `mounts` footnote:optelem[] container contains one or more `mount` child elements, with the name of the
+mountpoint as the content.
+
+Each `mount` element has one optional attribute, `type` footnote:optelem[], which can be one of:
+
+* https://www.vaultproject.io/docs/secrets/cubbyhole/[`cubbyhole`^]
+* https://www.vaultproject.io/docs/secrets/kv/kv-v1/[`kv1`^]
+* https://www.vaultproject.io/docs/secrets/kv/kv-v2/[`kv2`^] _(this is the default if not specified)_
+
+https://www.vaultproject.io/docs/secrets/[More mount types^] may be added upon popular demand and technical feasability.
+
 === GPG-Encrypted Elements
 Understandably, in order to have a persistent configuration, that means storing on disk. That also means that they need
 to be able to be accessed with no or minimal user interruption. Pass used GPG natively, so it didn't have an issue with
@@ -257,7 +282,7 @@ Let's look at an example of GPG-encrypted elements.
 
 ==== GPG-Encrypted Elements Example
 
-.`~/.config/vaultpass.xml` snippet:
+.`~/.config/vaultpass.xml`:
 [source,xml]
 ----
 <?xml version="1.0" encoding="UTF-8" ?>

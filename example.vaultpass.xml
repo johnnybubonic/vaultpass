@@ -14,8 +14,8 @@
          be able to iterate through available mounts if not. -->
     <!-- Default type if not specified is kv2. -->
     <mounts>
-        <mount type="kv">secrets_legacy</mount>
-        <mount type="kv2">secrets</mount>
+        <mount type="kv1">secret_legacy</mount>
+        <mount type="kv2">secret</mount>
         <mount type="cubbyhole">cubbyhole</mount>
     </mounts>
 </vaultpass>
