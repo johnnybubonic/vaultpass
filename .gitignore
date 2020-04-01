@@ -18,6 +18,12 @@ pkg/
 *.jar
 *.deb
 test*
+!testing/
+!testing/*
+testing/data
+testing/test.pid
+testing/testserver.json
+testing/vault.log
 __pycache__/
 logs/
 docs/README.html

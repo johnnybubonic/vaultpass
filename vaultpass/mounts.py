@@ -108,9 +108,10 @@ class MountHandler(object):
             if mount not in self.paths.keys():
                 self.paths[mount] = {}
             try:
+                _logger.debug('Fetching path {0} on mount {1}...'.format(path, mount))
                 paths = handler.list_secrets(**args)
             except hvac.exceptions.InvalidPath:
-                # It's a secret name.
+                # It's a secret name or doesn't exist.
                 _logger.debug('Path {0} on mount {1} is a secret, not a subdir.'.format(path, mount))
                 dpath.util.new(self.paths, fullpath, self.getSecretNames(path, mount, version = version))
                 continue
