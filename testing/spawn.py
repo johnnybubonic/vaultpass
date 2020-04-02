@@ -14,7 +14,7 @@ import psutil
 from lxml import etree
 ##
 from . import serverconf
-from . import vauptpassconf
+from . import vaultpassconf
 
 
 _url_re = re.compile(r'^(?P<proto>https?)://(?P<addr>[^:/]+)(:(?P<port>[0-9]+)?)?(?P<path>/.*)?$')
@@ -86,7 +86,7 @@ class VaultSpawner(object):
         if not fpath:
             fpath = self.clientconf_file
         clientconf = os.path.abspath(os.path.expanduser(fpath))
-        self.client_conf = vauptpassconf.getConfig(clientconf)
+        self.client_conf = vaultpassconf.getConfig(clientconf)
         return(None)
 
     def _getCreds(self, new_unseal = None, new_auth = None, write_conf = None):
@@ -117,6 +117,7 @@ class VaultSpawner(object):
         return(None)
 
     def _getProcess(self):
+        # TODO: check for pidfile in self.conf and read if file exists
         def clear():
             self.pid = None
             return(None)
@@ -277,3 +278,7 @@ def main():
     if args.cleanup:
         s.cleanup()
     return(None)
+
+
+if __name__ == '__main__':
+    main()
