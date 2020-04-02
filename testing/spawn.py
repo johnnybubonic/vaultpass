@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import json
 import os
 import re
@@ -16,9 +17,6 @@ from . import serverconf
 from . import vauptpassconf
 
 
-clientconf_file = './test.config.xml'
-
-
 _url_re = re.compile(r'^(?P<proto>https?)://(?P<addr>[^:/]+)(:(?P<port>[0-9]+)?)?(?P<path>/.*)?$')
 
 
@@ -33,9 +31,11 @@ class VaultSpawner(object):
     local = True
     pid = None
 
-    def __init__(self, conf, genconf = True):
+    def __init__(self, conf, genconf = True, clientconf_file = './test.config.xml', test_data = True, *args, **kwargs):
         self.conf = conf
         self.genconf = genconf
+        self.clientconf_file = clientconf_file
+        self.test_data = test_data  # TODO
         self._parseConf()
         self._getCreds()
         self._connCheck()
@@ -82,12 +82,16 @@ class VaultSpawner(object):
                 pass
         return(None)
 
-    def _getClientConf(self, fpath = clientconf_file):
+    def _getClientConf(self, fpath = None):
+        if not fpath:
+            fpath = self.clientconf_file
         clientconf = os.path.abspath(os.path.expanduser(fpath))
         self.client_conf = vauptpassconf.getConfig(clientconf)
         return(None)
 
-    def _getCreds(self, new_unseal = None, new_auth = None, write_conf = clientconf_file):
+    def _getCreds(self, new_unseal = None, new_auth = None, write_conf = None):
+        if not write_conf:
+            write_conf = self.clientconf_file
         self._getClientConf()
         rewrite_xml = False
         # TODO: finish regen of client conf and re-parse so new elements get added to both,
@@ -187,6 +191,15 @@ class VaultSpawner(object):
             serverconf.genConf(confdict = self.conf)
         return(None)
 
+    def cleanup(self):
+        storage = self.conf.get('storage', {}).get('file', {}).get('path')
+        if not storage:
+            return(None)
+        storage = os.path.abspath(os.path.expanduser(storage))
+        if os.path.isdir(storage):
+            shutil.rmtree(storage)
+        return(None)
+
     def start(self):
         self._getProcess()
         if self.is_running:
@@ -215,3 +228,52 @@ class VaultSpawner(object):
         self._initChk()
         return(None)
 
+    def stop(self):
+        self._getProcess()
+        if self.cmd:
+            self.cmd.kill()
+        else:
+            os.kill(self.pid)
+        return(None)
+
+
+def parseArgs():
+    args = argparse.ArgumentParser(description = 'Start/Stop a test Vault instance and ensure sample data exists')
+    args.add_argument('-n', '--no-test-data',
+                      dest = 'test_data',
+                      action = 'store_false',
+                      help = ('If specified, do not populate with test data (if it doesn\'t exist)'))
+    args.add_argument('-d', '--delete',
+                      dest = 'delete_storage',
+                      action = 'store_false',
+                      help = ('If specified, delete the storage backend first so a fresh instance is created'))
+    args.add_argument('-c', '--cleanup',
+                      dest = 'cleanup',
+                      action = 'store_true',
+                      help = ('If specified, remove the storage backend when stopping'))
+    args.add_argument('-s', '--server-conf',
+                      dest = 'conf',
+                      help = ('Specify a path to an alternate server configuration file. '
+                              'If not provided, a default one will be used'))
+    args.add_argument('-C', '--client-conf',
+                      default = './test.config.xml',
+                      dest = 'clientconf_file',
+                      help = ('Path to a vaultpass.xml to use. Default: ./test.config.xml'))
+    args.add_argument('oper',
+                      choices = ['start', 'stop'],
+                      help = ('Operation to perform. One of: start, stop'))
+    return(args)
+
+
+def main():
+    args = parseArgs().parse_args()
+    s = VaultSpawner(**vars(args))
+    if args.delete_storage:
+        s.cleanup()
+    if args.oper == 'start':
+        s.start()
+    elif args.oper == 'stop':
+        s.stop()
+    if args.cleanup:
+        s.cleanup()
+    return(None)
