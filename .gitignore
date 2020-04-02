@@ -24,6 +24,7 @@ testing/data
 testing/test.pid
 testing/testserver.json
 testing/vault.log
+testing/test.config.xml
 __pycache__/
 logs/
 docs/README.html

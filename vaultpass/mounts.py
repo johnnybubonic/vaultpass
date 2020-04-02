@@ -209,9 +209,7 @@ class MountHandler(object):
                 indent = 1
             return(pprint.pformat(self.paths, indent = indent))
         # elif output == 'tree':
-        #     # UNIX tree command output.
-        #     # has prefixes like ├──, │   ├──, └──, etc.
-        #     import tree
+        #     import tree  # TODO? Wayyy later.
         elif not output:
             return(str(self.paths))
         return(None)

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import copy
 import json
 import os
 
@@ -25,7 +26,7 @@ log_file = os.path.abspath(os.path.expanduser(log_file))
 
 def genConf(confdict = None):
     if not confdict:
-        confdict = default_conf.copy()
+        confdict = copy.deepcopy(default_conf)
     storage = confdict.get('storage')
     if storage:
         if 'file' in storage.keys():

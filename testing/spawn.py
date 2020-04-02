@@ -10,11 +10,12 @@ import subprocess
 import time
 ##
 import hvac
+import hvac.exceptions
 import psutil
 from lxml import etree
 ##
-from . import serverconf
-from . import vaultpassconf
+import serverconf
+from vaultpass import config as vaultpassconf
 
 
 _url_re = re.compile(r'^(?P<proto>https?)://(?P<addr>[^:/]+)(:(?P<port>[0-9]+)?)?(?P<path>/.*)?$')
@@ -30,6 +31,7 @@ class VaultSpawner(object):
     is_running = None
     local = True
     pid = None
+    is_new = False
 
     def __init__(self, conf, genconf = True, clientconf_file = './test.config.xml', test_data = True, *args, **kwargs):
         self.conf = conf
@@ -54,7 +56,10 @@ class VaultSpawner(object):
         try:
             self.port = int(r.groupdict().get('port', 80))
         except ValueError:
-            self.port = 80
+            if is_not_tls:
+                self.port = 80
+            else:
+                self.port = 443
         self.ip = socket.gethostbyname(r.groupdict()['addr'])
         sock = socket.socket()
         try:
@@ -65,14 +70,19 @@ class VaultSpawner(object):
                     self.is_running = False
                 except OSError as e:
                     if e.errno == 98:
+                        # Already in use
                         self.is_running = True
                     elif e.errno == 99:
                         # The address isn't on this box.
                         self.local = False
                         self.pid = None
+                finally:
+                    sock.close()
+                    sock = socket.socket()
             sock.connect((self.ip, self.port))
             sock.close()
-        except (ConnectionRefusedError, ConnectionAbortedError, ConnectionResetError):
+            self.is_running = True
+        except (ConnectionRefusedError, ConnectionAbortedError, ConnectionResetError) as e:
             self.is_running = False
         finally:
             try:
@@ -89,31 +99,36 @@ class VaultSpawner(object):
         self.client_conf = vaultpassconf.getConfig(clientconf)
         return(None)
 
-    def _getCreds(self, new_unseal = None, new_auth = None, write_conf = None):
+    def _getCreds(self, new_unseal = False, new_token = False, write_conf = None):
         if not write_conf:
             write_conf = self.clientconf_file
         self._getClientConf()
         rewrite_xml = False
-        # TODO: finish regen of client conf and re-parse so new elements get added to both,
-        #   and write out namespaced xml
-        unseal_xml = self.client_conf.namespaced_xml.find('.//{0}unseal'.format(self.client_conf.xml.nsmap[None]))
-        self.unseal = unseal_xml.text
-        auth_xml = self.client_conf.xml.find('.//{0}auth'.format(self.client_conf.xml.nsmap[None]))
+        xml = self.client_conf.xml
+        ns_xml = self.client_conf.namespaced_xml
+        nsmap = ns_xml.nsmap
+        unseal_ns_xml = ns_xml.find('.//{{{0}}}unseal'.format(nsmap[None]))
+        unseal_xml = xml.find('.//unseal')
+        auth_ns_xml = ns_xml.find('.//{{{0}}}auth'.format(nsmap[None]))
+        auth_xml = xml.find('.//auth')
+        token_ns_xml = auth_ns_xml.find('.//{{{0}}}token'.format(nsmap[None]))
         token_xml = auth_xml.find('.//token')
-        if unseal_xml is not None and not new_unseal:
+        if not new_unseal:
             self.unseal = unseal_xml.text
-        if token_xml is not None and not new_auth:
-            self.client.token = token_xml.text
-        if new_unseal:
-            unseal_xml.getparent().replace(unseal_xml, new_unseal)
+        else:
+            unseal_xml.text = self.unseal
+            unseal_ns_xml.text = self.unseal
             rewrite_xml = True
-        if new_auth:
-            auth_xml.getparent().replace(auth_xml, new_auth)
+        if not new_token:
+            self.client.token = token_xml.text
+        else:
+            token_xml.text = self.client.token
+            token_ns_xml.text = self.client.token
             rewrite_xml = True
         if rewrite_xml:
             write_conf = os.path.abspath(os.path.expanduser(write_conf))
-            with open(write_conf, 'w') as fh:
-                fh.write()  # TODO: which object?
+            with open(write_conf, 'wb') as fh:
+                fh.write(self.client_conf.toString())
         return(None)
 
     def _getProcess(self):
@@ -135,7 +150,7 @@ class VaultSpawner(object):
                 # so we have *no* way to get the PID as a regular user.
                 raise RuntimeError('Cannot determine Vault instance to manage')
             elif len(processes) == 1:
-                self.pid = self.processes[0].pid
+                self.pid = processes[0].pid
             else:
                 # We're running as root.
                 conns = [c for c in psutil.net_connections() if c.laddr.ip == ip and c.laddr.port == port]
@@ -156,13 +171,8 @@ class VaultSpawner(object):
             init_rslt = self.client.sys.initialize(secret_shares = 1, secret_threshold = 1)
             self.unseal = init_rslt['keys_base64'][0]
             self.client.token = init_rslt['root_token']
-            newauth = etree.Element('auth')
-            newtoken = etree.Element('token')
-            newtoken.text = self.client.token
-            newauth.append(newtoken)
-            newunseal = etree.Element('unseal')
-            newunseal.text = self.unseal
-            self._getCreds(new_auth = newauth, new_unseal = newunseal)
+            self._getCreds(new_token = True, new_unseal = True)
+            self.is_new = True
         if self.client.sys.is_sealed():
             self.client.sys.submit_unseal_key(self.unseal)
         return(True)
@@ -172,7 +182,8 @@ class VaultSpawner(object):
         rawconf = None
         if not self.conf:
             if os.path.isfile(serverconf.conf_file):
-                self.conf = serverconf.conf_file
+                with open(serverconf.conf_file, 'r') as fh:
+                    self.conf = json.loads(fh.read())
             else:
                 # Use the default.
                 self.genconf = True
@@ -201,31 +212,95 @@ class VaultSpawner(object):
             shutil.rmtree(storage)
         return(None)
 
+    def populate(self, strict = False):
+        mounts = {}
+        if not self.is_running:
+            self.start()
+        if not self.is_new and strict:
+            return(None)
+        if self.is_new:
+            opts = {'file_path': serverconf.log_file,
+                    'log_raw': True,
+                    'hmac_accessor': False}
+            self.client.sys.enable_audit_device(device_type = 'file',
+                                                description = 'Testing log',
+                                                options = opts)
+        mount_xml = self.client_conf.xml.find('.//mount')
+        if mount_xml is not None:
+            for mount in mount_xml:
+                mtype = mount.attrib.get('type', 'kv2')
+                mounts[mount.text] = mtype
+        else:
+            # Use a default set.
+            mounts['secret'] = 'kv2'
+            mounts['secret_legacy'] = 'kv1'
+        for idx, (mname, mtype) in enumerate(mounts.items()):
+            opts = None
+            orig_mtype = mtype
+            if mtype.startswith('kv'):
+                opts = {'version': re.sub(r'^kv([0-9]+)$', r'\g<1>', mtype)}
+                mtype = 'kv'
+            try:
+                self.client.sys.enable_secrets_engine(mtype,
+                                                      path = mname,
+                                                      description = 'Testing mount ({0})'.format(mtype),
+                                                      options = opts)
+            except hvac.exceptions.InvalidRequest:
+                # It probably already exists.
+                pass
+            if orig_mtype not in ('kv', 'kv2', 'cubbyhole'):
+                continue
+            args = {'path': 'test_secret{0}/foo{1}'.format(idx, mname),
+                    'mount_point': mname,
+                    'secret': 'bar{0}'.format(idx)}
+            handler = None
+            if orig_mtype == 'cubbyhole':
+                handler = self.client.write
+                args['path'] = '{0}/test_secret{1}'.format(mname, idx)
+                args['foo_{0}'.format(mname)] = 'bar{0}'.format(idx)
+                del(args['mount_point'])
+            elif orig_mtype == 'kv1':
+                handler = self.client.secrets.kv.v1.create_or_update_secret
+            elif orig_mtype == 'kv2':
+                handler = self.client.secrets.kv.v2.create_or_update_secret
+            try:
+                handler(**args)
+            except hvac.exceptions.InvalidPath:
+                print('{0} path invalid'.format(args['path']))
+            except Exception as e:
+                print('Exception: {0} ({1})'.format(e, e.__class__))
+        return(None)
+
     def start(self):
         self._getProcess()
-        if self.is_running:
+        if self.is_running or not self.local:
             # Already started.
             self._initChk()
             return(None)
-        if not self.local:
-            # It's a remote address
-            self._initChk()
-            return(None)
-        cmd_str = [self.binary_path, 'server']
-        cmd_str.extend(['-config', serverconf.conf_file])
-        # We have to use Popen because even vault server doesn't daemonize.
+        cmd_str = [self.binary_path, 'server',
+                   '-config', serverconf.conf_file]
+        # We have to use .Popen() instead of .run() because even "vault server" doesn't daemonize.
         # Gorram it, HashiCorp.
         self.cmd = subprocess.Popen(cmd_str, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
-        if self.cmd.returncode != 0:
-            print('STDERR:\n{0}'.format(self.cmd.stderr.decode('utf-8')))
-            raise RuntimeError('Vault did not start correctly')
         attempts = 5
-        seconds = 3
-        while not self.is_running and attempts != 0:
-            self._connCheck()
+        seconds = 5
+        while attempts > 0:
+            self._connCheck(bind = False)
+            if self.is_running:
+                break
             time.sleep(seconds)
+            attempts -= 1
         if not self.is_running:
+            stdout = self.cmd.stdout.read().decode('utf-8').strip()
+            stderr = self.cmd.stdout.read().decode('utf-8').strip()
+            for x in ('stdout', 'stderr'):
+                if locals()[x] != '':
+                    print('{0}:\n{1}'.format(x.upper(), locals()[x]))
+            self.cmd.kill()
+            del(self.cmd)
+            self.cmd = None
             raise TimeoutError('Could not start Vault')
+        time.sleep(2)  # We need to make sure we give enough time for it to start up
         self._initChk()
         return(None)
 
@@ -234,7 +309,8 @@ class VaultSpawner(object):
         if self.cmd:
             self.cmd.kill()
         else:
-            os.kill(self.pid)
+            import signal
+            os.kill(self.pid, signal.SIGKILL)
         return(None)
 
 

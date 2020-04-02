@@ -1,1 +1,0 @@
-../vaultpass/config.py
