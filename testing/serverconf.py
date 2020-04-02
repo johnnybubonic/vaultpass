@@ -8,10 +8,10 @@ conf_file = './testserver.json'
 log_file = './vault.log'
 
 default_conf = {'listener': [
-                                {'tcp': '127.0.0.1:8200',
-                                 'tls_disable': True}
+                                {'tcp': {'address': '127.0.0.1:8200',
+                                         'tls_disable': True}}
                             ],
-                'storage': {'file': './data'},
+                'storage': {'file': {'path': './data'}},
                 'log_level': 'Debug',  # highest is 'Trace'
                 'pid_file': './test.pid',
                 'raw_storage_endpoint': True,
@@ -29,7 +29,7 @@ def genConf(confdict = None):
     storage = confdict.get('storage')
     if storage:
         if 'file' in storage.keys():
-            storage['file'] = os.path.abspath(os.path.expanduser(storage['file']))
+            storage['file']['path'] = os.path.abspath(os.path.expanduser(storage['file']['path']))
             confdict['storage'] = storage
     if 'pid_file' in confdict:
         confdict['pid_file'] = os.path.abspath(os.path.expanduser(confdict['pid_file']))
