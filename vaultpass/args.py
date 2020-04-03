@@ -5,10 +5,13 @@ from . import constants
 
 def parseArgs():
     args = argparse.ArgumentParser(description = 'VaultPass - a Vault-backed Pass replacement',
-                                   prog = 'pass',
+                                   prog = 'VaultPass',
                                    epilog = ('This program has context-specific help. Try "... cp --help". '
                                              'This help output is intentionally terse; see "man 1 vaultpass" and the '
                                              'README for more complete information, configuration, and usage.'))
+    args.add_argument('-V', '--version',
+                      action = 'version',
+                      version = '%(prog)s {0}'.format(constants.VERSION))
     args.add_argument('-c', '--config',
                       default = '~/.config/vaultpass.xml',
                       help = ('The path to your configuration file. Default: ~/.config/vaultpass.xml'))
@@ -22,26 +25,56 @@ def parseArgs():
                                     metavar = 'OPERATION',
                                     dest = 'oper')
     cp = subparser.add_parser('cp',
+                              description = ('Copy a secret from one path to another'),
+                              help = ('Copy a secret from one path to another'),
                               aliases = ['copy'])
-    edit = subparser.add_parser('edit')
+    edit = subparser.add_parser('edit',
+                                description = ('Edit an existing secret or create it if it does not exist'),
+                                help = ('Edit an existing secret or create it if it does not exist'))
     find = subparser.add_parser('find',
+                                description = ('Find the path to a secret given a regex of the name'),
+                                help = ('Find the path to a secret given a regex of the name'),
                                 aliases = ['search'])
-    gen = subparser.add_parser('generate')
-    git = subparser.add_parser('git')  # Dummy opt; do nothing
-    grep = subparser.add_parser('grep')
-    helpme = subparser.add_parser('help')
-    initvault = subparser.add_parser('init')
+    gen = subparser.add_parser('generate',
+                               description = ('Generate a password/passphrase'),
+                               help = ('Generate a password/passphrase'))
+    # Dummy opt; do nothing
+    git = subparser.add_parser('git',
+                               description = ('This operation does nothing except maintain compatibility'))
+    grep = subparser.add_parser('grep',
+                                description = ('Search secret content by regex'),
+                                help = ('Search secret content by regex'))
+    helpme = subparser.add_parser('help',
+                                  description = ('Show this help and exit'),
+                                  help = ('Show this help and exit'))
+    initvault = subparser.add_parser('init',
+                                     description = ('This operation does nothing except maintain compatibility'),
+                                     help = ('This operation does nothing except maintain compatibility'))
     insertval = subparser.add_parser('insert',
+                                     description = ('Add a new secret (or overwrite one)'),
+                                     help = ('Add a new secret (or overwrite one)'),
                                      aliases = ['add'])
     ls = subparser.add_parser('ls',
+                              description = ('List names of secrets available'),
+                              help = ('List names of secrets available'),
                               aliases = ['list'])
     mv = subparser.add_parser('mv',
-                              aliases = ['rename'])
+                              description = ('Moves a secret to a different path'),
+                              help = ('Moves a secret to a different path'),
+                              aliases = ['rename', 'move'])
     rm = subparser.add_parser('rm',
+                              description = ('Delete a secret'),
+                              help = ('Delete a secret'),
                               aliases = ['remove', 'delete'])
-    show = subparser.add_parser('show')
-    version = subparser.add_parser('version')
-    importvault = subparser.add_parser('import')
+    show = subparser.add_parser('show',
+                                description = ('Print/fetch a secret'),
+                                help = ('Print/fetch a secret'))
+    version = subparser.add_parser('version',
+                                   description = ('Print the VaultPass version and exit'),
+                                   help = ('Print the VaultPass version and exit'))
+    importvault = subparser.add_parser('import',
+                                       description = ('Import your existing Pass into Vault'),
+                                       help = ('Import your existing Pass into Vault'))
     # CP/COPY
     cp.add_argument('-f', '--force',
                     dest = 'force',
@@ -69,6 +102,7 @@ def parseArgs():
                       metavar = 'NAME_PATTERN',
                       help = ('List secrets\' paths whose names match the regex NAME_PATTERN'))
     # GENERATE
+    # TODO: feature parity with passgen (spaces? etc.)
     gen.add_argument('-n', '--no-symbols',
                      dest = 'symbols',
                      action = 'store_false',
@@ -130,94 +164,94 @@ def parseArgs():
     ## DUMMY OPTIONS ##
     ####################################################################################################################
     grep.add_argument('-V', '--version',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-E', '--extended-regexp',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-F', '--fixed-strings',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-G', '--basic-regexp',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-P', '--perl-regexp',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-i', '--ignore_case',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('--no-ignore-case',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-v', '--invert-match',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-w', '--word-regexp',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-x', '--line-regexp',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-y',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-c', '--count',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-L', '--files-without-match',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-l', '--files-with-matches',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-o', '--only-matching',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-q', '--quiet', '--silent',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-s', '--no-messages',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-b', '--byte-offset',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-H', '--with-filename',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-n', '--line-number',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-T', '--initial-tab',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-u', '--unix-byte-offsets',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-Z', '--null',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-a', '--text',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-I',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-r', '--recursive',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-R', '--dereference-recursive',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('--line-buffered',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-U', '--binary',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-z', '--null-data',
-                      action='store_true',
+                      action = 'store_true',
                       help = ('(Dummy option; kept for compatibility reasons)'))
     grep.add_argument('-e', '--regexp',
                       dest = 'dummy_0',
@@ -285,5 +319,81 @@ def parseArgs():
     grep.add_argument('pattern',
                       metavar = 'REGEX_PATTERN',
                       help = ('Regex pattern to search passwords'))
+    # HELP has no arguments.
+    # INIT
+    initvault.add_argument('-p', '--path',
+                           dest = 'path',
+                           help = ('(Dummy option; kept for compatibility reasons)'))
+    initvault.add_argument('gpg_id',
+                           dest = 'gpg_id',
+                           help = ('(Dummy option; kept for compatibility reasons)'))
+    # INSERT
+    # TODO: if -e/--echo is specified and sys.stdin, use sys.stdin rather than prompt
+    insertval.add_argument('-e', '--echo',
+                           dest = 'allow_shouldersurf',
+                           action = 'store_true',
+                           help = ('If specified, enable keyboard echo (show the secret as it\'s being typed) and '
+                                   'disable confirmation'))
+    insertval.add_argument('-m', '--multiline',
+                           action = 'store_true',
+                           dest = 'multiline',
+                           help = ('If specified, keep reading stdin until EOF is reached or ctrl-d is pressed'))
+    insertval.add_argument('-f', '--force',
+                           action = 'store_true',
+                           help = ('If specified, overwrite any existing secret without prompting'))
+    insertval.add_argument('-n', '--no-confirm',
+                           dest = 'confirm',
+                           action = 'store_false',
+                           help = ('If specified, disable password prompt confirmation. '
+                                   'Has no effect if -e/--echo is specified'))
+    # LS
+    ls.add_argument('path',
+                    metavar = 'PATH/TO/TREE/BASE',
+                    help = ('List names of secrets recursively, starting at PATH/TO/TREE/BASE'))
+    # MV
+    mv.add_argument('-f', '--force',
+                    dest = 'force',
+                    action = 'store_true',
+                    help = ('If specified, replace NEWPATH if it exists'))
+    mv.add_argument('oldpath',
+                    metavar = 'OLDPATH',
+                    help = ('The original ("source") path for the secret'))
+    mv.add_argument('newpath',
+                    metavar = 'NEWPATH',
+                    help = ('The new ("destination") path for the secret'))
+    # RM
+    # Is this argument even sensible since it isn't a filesystem?
+    rm.add_argument('-r', '--recursive',
+                    dest = 'recurse',
+                    action = 'store_true',
+                    help = ('If PATH/TO/SECRET is a directory, delete all subentries'))
+    rm.add_argument('-f', '--force',
+                    dest = 'force',
+                    action = 'store_true',
+                    help = ('If specified, delete all matching path(s) without prompting for confirmation'))
+    rm.add_argument('path',
+                    metavar = 'PATH/TO/SECRET',
+                    help = ('The path to the secret or subdirectory'))
+    # SHOW
+    show.add_argument('-c', '--clip',
+                      nargs = '?',
+                      type = int,
+                      default = constants.SHOW_CLIP_LINENUM,
+                      metavar = 'LINE_NUMBER',
+                      dest = 'clip',
+                      help = ('If specified, copy line number LINE_NUMBER (Default: {0}) from the secret to the '
+                              'clipboard instead of printing it.').format(constants.SHOW_CLIP_LINENUM))
+    show.add_argument('-q', '--qrcode',
+                      nargs = '?',
+                      type = int,
+                      metavar = 'LINE_NUMBER',
+                      default = constants.SHOW_CLIP_LINENUM,
+                      help = ('If specified, do not print the secret at  but instead '))
+    show.add_argument('-s', '--seconds',
+                      dest = 'seconds',
+                      type = int,
+                      default = constants.CLIP_TIMEOUT,
+                      help = ('If copying to the clipboard (see -c/--clip), clear the clipboard after this many '
+                              'seconds. Default: {0}').format(constants.CLIP_TIMEOUT))
 
     return(args)

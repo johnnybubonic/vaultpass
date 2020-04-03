@@ -1,5 +1,6 @@
 import logging
 import re
+import shutil
 import warnings
 ##
 import dpath.util  # https://pypi.org/project/dpath/
@@ -174,12 +175,12 @@ class MountHandler(object):
         return(None)
 
     def printer(self, output = None, indent = 4):
-        def treePrint(obj, s = 'Password Store\n', level = 0):
-            prefix = '├──'
-            leading_prefix = '│'
-            last_prefix = '└──'
-            pass
-            return(s)
+        # def treePrint(obj, s = 'Password Store\n', level = 0):
+        #     prefix = '├──'
+        #     leading_prefix = '│'
+        #     last_prefix = '└──'
+        #     pass
+        #     return(s)
         if output:
             output = output.lower()
         if output and output not in ('pretty', 'yaml', 'json'):
@@ -207,7 +208,7 @@ class MountHandler(object):
             import pprint
             if indent is None:
                 indent = 1
-            return(pprint.pformat(self.paths, indent = indent))
+            return(pprint.pformat(self.paths, indent = indent, width = shutil.get_terminal_size((80, 20)).columns))
         # elif output == 'tree':
         #     import tree  # TODO? Wayyy later.
         elif not output:

@@ -7,7 +7,11 @@ def main():
     rawargs = vaultpass.args.parseArgs()
     args = rawargs.parse_args()
     if not args.oper:
-        args.oper = 'show'
+        rawargs.print_help()
+        return(None)
+    if args.oper == 'help':
+        rawargs.print_help()
+        return(None)
     import pprint
     pprint.pprint(vars(args))
     return(None)
