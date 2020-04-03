@@ -1,0 +1,24 @@
+= vaultpass(1)
+Brent Saner <r00t@square-r00t.net>
+
+:doctype: manpage
+:manmanual: VAULTPASS
+:mansource: VAULTPASS
+:man-linkstyle: pass:[blue R < >]
+
+== Name
+
+vaultpass - A Vault-backed replacement for Pass
+
+== Synopsis
+
+*vaultpass* [_OPERATION_] _OPTIONS_...
+
+[#operations]
+== Operations
+
+See *<<common-options,Common Options>>* for arguments that are available for all operations.
+
+*cp*::
+  foo
+// TODO

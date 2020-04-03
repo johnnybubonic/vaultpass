@@ -3,10 +3,13 @@ import os
 ##
 from . import logger
 _logger = logging.getLogger('VaultPass')
+from . import args
 from . import auth
 from . import clipboard
 from . import config
+from . import constants
 from . import mounts
+from . import pass_import
 
 
 class PassMan(object):
