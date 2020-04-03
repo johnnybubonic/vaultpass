@@ -19,6 +19,7 @@ from vaultpass import config as vaultpassconf
 
 
 _url_re = re.compile(r'^(?P<proto>https?)://(?P<addr>[^:/]+)(:(?P<port>[0-9]+)?)?(?P<path>/.*)?$')
+_default_client_conf = './test.config.xml'
 
 
 class VaultSpawner(object):
@@ -32,11 +33,22 @@ class VaultSpawner(object):
     local = True
     pid = None
     is_new = False
+    ip = None
+    port = None
 
-    def __init__(self, conf, genconf = True, clientconf_file = './test.config.xml', test_data = True, *args, **kwargs):
+    def __init__(self, conf, genconf = True, clientconf_file = None, test_data = True, *args, **kwargs):
         self.conf = conf
         self.genconf = genconf
-        self.clientconf_file = clientconf_file
+        if clientconf_file:
+            self.clientconf_file = clientconf_file
+        else:
+            fpath = os.path.abspath(os.path.expanduser(_default_client_conf))
+            fname = os.path.split(fpath)[-1]
+            loc_fpath = os.path.abspath(os.path.expanduser('./local.{0}'.format(fname)))
+            if os.path.isfile(loc_fpath):
+                self.clientconf_file = loc_fpath
+            else:
+                self.clientconf_file = fpath
         self.test_data = test_data  # TODO
         self._parseConf()
         self._getCreds()
@@ -137,6 +149,7 @@ class VaultSpawner(object):
             self.pid = None
             return(None)
         self._getCreds()
+        self._connCheck(bind = False)
         if not self.local:
             clear()
             return(None)
@@ -153,7 +166,7 @@ class VaultSpawner(object):
                 self.pid = processes[0].pid
             else:
                 # We're running as root.
-                conns = [c for c in psutil.net_connections() if c.laddr.ip == ip and c.laddr.port == port]
+                conns = [c for c in psutil.net_connections() if c.laddr.ip == self.ip and c.laddr.port == self.port]
                 if not len(conns) == 1:
                     # This, theoretically, should never happen.
                     raise RuntimeError('Cannot determine Vault instance to manage')
@@ -232,6 +245,7 @@ class VaultSpawner(object):
                 mounts[mount.text] = mtype
         else:
             # Use a default set.
+            mounts['cubbyhole'] = 'cubbyhole'
             mounts['secret'] = 'kv2'
             mounts['secret_legacy'] = 'kv1'
         for idx, (mname, mtype) in enumerate(mounts.items()):
@@ -248,17 +262,18 @@ class VaultSpawner(object):
             except hvac.exceptions.InvalidRequest:
                 # It probably already exists.
                 pass
-            if orig_mtype not in ('kv', 'kv2', 'cubbyhole'):
+            if orig_mtype not in ('kv1', 'kv2', 'cubbyhole'):
                 continue
             args = {'path': 'test_secret{0}/foo{1}'.format(idx, mname),
                     'mount_point': mname,
-                    'secret': 'bar{0}'.format(idx)}
+                    'secret': {'bar{0}'.format(idx): 'baz'}}
             handler = None
             if orig_mtype == 'cubbyhole':
                 handler = self.client.write
                 args['path'] = '{0}/test_secret{1}'.format(mname, idx)
                 args['foo_{0}'.format(mname)] = 'bar{0}'.format(idx)
                 del(args['mount_point'])
+                del(args['secret'])
             elif orig_mtype == 'kv1':
                 handler = self.client.secrets.kv.v1.create_or_update_secret
             elif orig_mtype == 'kv2':
@@ -333,7 +348,7 @@ def parseArgs():
                       help = ('Specify a path to an alternate server configuration file. '
                               'If not provided, a default one will be used'))
     args.add_argument('-C', '--client-conf',
-                      default = './test.config.xml',
+                      # default = './test.config.xml',
                       dest = 'clientconf_file',
                       help = ('Path to a vaultpass.xml to use. Default: ./test.config.xml'))
     args.add_argument('oper',
@@ -349,6 +364,8 @@ def main():
         s.cleanup()
     if args.oper == 'start':
         s.start()
+        if args.test_data:
+            s.populate()
     elif args.oper == 'stop':
         s.stop()
     if args.cleanup:
