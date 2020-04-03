@@ -344,7 +344,6 @@ lCmbJtQcjxG/eJ/SrB2oS47YdEKRy+cH0Xx+
 <BINARY DATA>
 ----
 
-
 ===== Decrypted
 [source,xml]
 ----
@@ -356,3 +355,92 @@ lCmbJtQcjxG/eJ/SrB2oS47YdEKRy+cH0Xx+
 
 </auth>
 ----
+
+
+== Known Incompatibilities with Pass
+=== **`PASSWORD_STORE_ENABLE_EXTENSIONS`**,`.extensions/COMMAND.bash`, and Default Subcommands
+==== Issue Description
+Per the Pass man page:
+
+.PASS(1)
+....
+If no COMMAND is specified, COMMAND defaults to either show or ls, depending on the type of specifier in ARGS. Alternatively, if PASSWORD_STORE_ENABLE_EXTENSIONS is set to "true", and the file .extensions/COMMAND.bash exists inside the password store and is executable, then it is sourced into the environment, passing any arguments and environment variables. Extensions existing in a system-wide directory, only installable by the administrator, are always enabled.
+....
+
+Due to this being Python, we lose some of this compatability. It may be possible to add this functionality in the
+future, but it's lower priority currently.
+
+Similarly, we cannot set a default subcommand as of yet in Python via `argparse` (the library that VaultPass uses to
+parse command-line arguments).
+
+==== Workaround(s)
+You can set an alias in your `~/.bashrc` that will:
+
+. Execute `show` by default
+. Provide a direct command for `ls` operations
+. Specify default options for a command
+
+Via the following:
+
+.`~/.bashrc`:
+[source,bash]
+----
+# ...
+
+# 1
+alias pass='vaultpass show'
+
+# 2
+alias lpass='vaultpass ls'
+
+# 3
+alias vaultpass='vaultpass -c ~/.config/alternate.vaultpass.xml'
+----
+
+To use the non-aliased command in Bash, you can either invoke the full path:
+
+[source,bash]
+----
+/usr/local/bin/vaultpass edit path/to/secret
+----
+
+Or, alternatively, prefix with a backslash:
+
+[source,bash]
+----
+\vaultpass edit path/to/secret
+----
+
+Finally, you can always use VaultPass by specifying the subcommand and disregard aliases entirely.
+
+
+=== **find**/**search** Subcommand Searching
+==== Issue Description
+Pass used http://man7.org/linux/man-pages/man1/find.1.html[**find(1)**^] to search secret paths. Because we use Vault
+and not a filesystem hierarchy, this isn't applicable. As such, the normal https://www.gnu.org/software/findutils/manual/html_mono/find.html[`find`^] globbing language is not supported...
+
+==== Workaround(s)
+What *is* supported, however, is regular expressions' ("regex") match patterns.
+
+If you haven't used regexes before, here are some helpful starters/tools:
+
+* https://www.regular-expressions.info/tutorial.html
+* https://regexone.com/
+* https://regexr.com/
+* https://docs.python.org/library/re.html#regular-expression-syntax
+* https://regexcrossword.com/
+* https://learncodethehardway.org/regex/
+
+Regular expressions are MUCH more powerful than the `find` globbing language, but do have a slight learning curve. You
+will be thankful to learn their syntax, however, as they are very widely applicable.
+
+=== Environment Variables
+==== Issue Description
+Pass (and to a slightly lesser extent, Vault) relies almost entirely/exclusively upon environment variables for
+configuration. VaultPass does not.
+
+==== Workaround(s)
+Relying entirely on environment variables for configuration is dumb, so I don't rely on that. All persistent
+configuration can be either specified in the <<configuration,configuration file>> or can be overridden by
+flags/switches to subcommands. **Some** configuration directives/behaviour may be overridden by environment variables,
+but by and large this is not the case.
