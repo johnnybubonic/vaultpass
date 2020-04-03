@@ -367,7 +367,7 @@ Per the Pass man page:
 If no COMMAND is specified, COMMAND defaults to either show or ls, depending on the type of specifier in ARGS. Alternatively, if PASSWORD_STORE_ENABLE_EXTENSIONS is set to "true", and the file .extensions/COMMAND.bash exists inside the password store and is executable, then it is sourced into the environment, passing any arguments and environment variables. Extensions existing in a system-wide directory, only installable by the administrator, are always enabled.
 ....
 
-Due to this being Python, we lose some of this compatability. It may be possible to add this functionality in the
+Due to this being Python, we lose some of this compatibility. It may be possible to add this functionality in the
 future, but it's lower priority currently.
 
 Similarly, we cannot set a default subcommand as of yet in Python via `argparse` (the library that VaultPass uses to
@@ -440,7 +440,11 @@ Pass (and to a slightly lesser extent, Vault) relies almost entirely/exclusively
 configuration. VaultPass does not.
 
 ==== Workaround(s)
-Relying entirely on environment variables for configuration is dumb, so I don't rely on that. All persistent
+Relying entirely on environment variables for configuration is dumb, so I don't do on that. All persistent
 configuration can be either specified in the <<configuration,configuration file>> or can be overridden by
-flags/switches to subcommands. **Some** configuration directives/behaviour may be overridden by environment variables,
-but by and large this is not the case.
+flags/switches to subcommands. **Some** configuration directives/behaviour may be overridden by environment variables
+where supported by Vault/Pass upstream configuration.
+
+
+== Submitting a Bug Report/Feature Request
+Please use https://bugs.square-r00t.net/index.php?do=newtask&project=13[my bugtracker^].

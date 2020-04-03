@@ -3,7 +3,9 @@ import string
 
 # These are static.
 VERSION = '0.0.1'
-ALPHA_PASS_CHARS = string.ascii_letters
+ALPHA_LOWER_PASS_CHARS = string.ascii_lowercase
+ALPHA_UPPER_PASS_CHARS = string.ascii_uppercase
+ALPHA_PASS_CHARS = ALPHA_LOWER_PASS_CHARS + ALPHA_UPPER_PASS_CHARS
 NUM_PASS_CHARS = string.digits
 ALPHANUM_PASS_CHARS = ALPHA_PASS_CHARS + NUM_PASS_CHARS
 SYMBOL_PASS_CHARS = string.punctuation
@@ -13,7 +15,7 @@ CLIP_TIMEOUT = 45
 SELECTED_PASS_CHARS = ALL_PASS_CHARS
 SELECTED_PASS_NOSYMBOL_CHARS = ALPHANUM_PASS_CHARS
 CLIPBOARD = 'clipboard'
-GENERATED_LENGTH = 25  # I personally would prefer 32, but Pass compatability...
+GENERATED_LENGTH = 25  # I personally would prefer 32, but Pass compatibility...
 EDITOR = 'vi'  # vi is on ...every? single distro and UNIX/UNIX-like, to my knowledge.
 
 if not os.environ.get('NO_VAULTPASS_ENVS'):

@@ -88,7 +88,7 @@ def parseArgs():
                      dest = 'chars',
                      default = constants.SELECTED_PASS_CHARS,
                      help = ('The characters to use when generating a password (symbols included). '
-                             'Default: {0}').format(constants.SELECTED_PASS_CHARS))
+                             'Default: {0}').format(constants.SELECTED_PASS_CHARS.replace('%', '%%')))
     gen.add_argument('-Cn', '--characters-no-symbols',
                      dest = 'chars_plain',
                      default = constants.SELECTED_PASS_NOSYMBOL_CHARS,
@@ -113,7 +113,177 @@ def parseArgs():
     gen.add_argument('length',
                      type = int,
                      default = constants.GENERATED_LENGTH,
+                     nargs = '?',
                      metavar = 'LENGTH',
                      help = ('The length (number of characters) in the generated password. '
                              'Default: {0}').format(constants.GENERATED_LENGTH))
+    # GIT
+    git.add_argument('dummy_opts',
+                     nargs = '+',
+                     default = None,
+                     metavar = 'dummy',
+                     help = ('(Unused; kept for compatibility reasons)'))
+    # GREP
+    # I wish argparse supported arbitrary arguments.
+    # It *KIND* of does: https://stackoverflow.com/a/37367814/733214 but then I wouldn't be able to properly grab the
+    # regex pattern without more hackery. So here's to wasting my life.
+    ## DUMMY OPTIONS ##
+    ####################################################################################################################
+    grep.add_argument('-V', '--version',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-E', '--extended-regexp',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-F', '--fixed-strings',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-G', '--basic-regexp',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-P', '--perl-regexp',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-i', '--ignore_case',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('--no-ignore-case',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-v', '--invert-match',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-w', '--word-regexp',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-x', '--line-regexp',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-y',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-c', '--count',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-L', '--files-without-match',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-l', '--files-with-matches',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-o', '--only-matching',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-q', '--quiet', '--silent',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-s', '--no-messages',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-b', '--byte-offset',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-H', '--with-filename',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-n', '--line-number',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-T', '--initial-tab',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-u', '--unix-byte-offsets',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-Z', '--null',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-a', '--text',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-I',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-r', '--recursive',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-R', '--dereference-recursive',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('--line-buffered',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-U', '--binary',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-z', '--null-data',
+                      action='store_true',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-e', '--regexp',
+                      dest = 'dummy_0',
+                      metavar = 'PATTERNS',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-f', '--file',
+                      dest = 'dummy_1_0',
+                      metavar = 'FILE',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('--exclude-from',
+                      dest = 'dummy_1_1',
+                      metavar = 'FILE',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-m', '--max-count',
+                      dest = 'dummy_2_0',
+                      metavar = 'NUM',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-A', '--after-context',
+                      dest = 'dummy_2_1',
+                      metavar = 'NUM',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-B', '--before-context',
+                      dest = 'dummy_2_2',
+                      metavar = 'NUM',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-C', '--context',
+                      dest = 'dummy_2_3',
+                      metavar = 'NUM',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('--label',
+                      dest = 'dummy_3',
+                      metavar = 'LABEL',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('--binary-files',
+                      dest = 'dummy_4',
+                      metavar = 'TYPE',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-D', '--devices',
+                      dest = 'dummy_5_0',
+                      metavar = 'ACTION',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('-d', '--directories',
+                      dest = 'dummy_5_1',
+                      metavar = 'ACTION',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('--exclude',
+                      dest = 'dummy_6_0',
+                      metavar = 'GLOB',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('--exclude-dir',
+                      dest = 'dummy_6_1',
+                      metavar = 'GLOB',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('--include',
+                      dest = 'dummy_6_2',
+                      metavar = 'GLOB',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    grep.add_argument('--color', '--colour',
+                      dest = 'dummy_7',
+                      metavar = 'WHEN',
+                      const = None,
+                      nargs = '?',
+                      help = ('(Dummy option; kept for compatibility reasons)'))
+    ####################################################################################################################
+    grep.add_argument('pattern',
+                      metavar = 'REGEX_PATTERN',
+                      help = ('Regex pattern to search passwords'))
+
     return(args)
