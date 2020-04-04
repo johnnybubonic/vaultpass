@@ -12,6 +12,9 @@ def main():
     if args.oper == 'help':
         rawargs.print_help()
         return(None)
+    if args.oper == 'version':
+        print('{0} {1}'.format(vaultpass.constants.NAME,
+                               vaultpass.constants.VERSION))
     import pprint
     pprint.pprint(vars(args))
     return(None)

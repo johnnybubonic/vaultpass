@@ -1,17 +1,18 @@
 import argparse
+import os
 ##
 from . import constants
 
 
 def parseArgs():
     args = argparse.ArgumentParser(description = 'VaultPass - a Vault-backed Pass replacement',
-                                   prog = 'VaultPass',
+                                   prog = constants.NAME,
                                    epilog = ('This program has context-specific help. Try "... cp --help". '
                                              'This help output is intentionally terse; see "man 1 vaultpass" and the '
                                              'README for more complete information, configuration, and usage.'))
     args.add_argument('-V', '--version',
                       action = 'version',
-                      version = '%(prog)s {0}'.format(constants.VERSION))
+                      version = '{0} {1}'.format(constants.NAME, constants.VERSION))
     args.add_argument('-c', '--config',
                       default = '~/.config/vaultpass.xml',
                       help = ('The path to your configuration file. Default: ~/.config/vaultpass.xml'))
@@ -44,6 +45,7 @@ def parseArgs():
     grep = subparser.add_parser('grep',
                                 description = ('Search secret content by regex'),
                                 help = ('Search secret content by regex'))
+    # This just does the same as -h/--help.
     helpme = subparser.add_parser('help',
                                   description = ('Show this help and exit'),
                                   help = ('Show this help and exit'))
@@ -382,18 +384,55 @@ def parseArgs():
                       metavar = 'LINE_NUMBER',
                       dest = 'clip',
                       help = ('If specified, copy line number LINE_NUMBER (Default: {0}) from the secret to the '
-                              'clipboard instead of printing it.').format(constants.SHOW_CLIP_LINENUM))
+                              'clipboard instead of printing it. '
+                              'Use 0 for LINE_NUMBER for the entire secret').format(constants.SHOW_CLIP_LINENUM))
     show.add_argument('-q', '--qrcode',
                       nargs = '?',
                       type = int,
                       metavar = 'LINE_NUMBER',
                       default = constants.SHOW_CLIP_LINENUM,
-                      help = ('If specified, do not print the secret at  but instead '))
+                      help = ('If specified, do not print the secret at line number LINE_NUMBER (Default: {0}) but '
+                              'instead generate a QR code of it (either graphically or in-terminal depending on '
+                              'environment). '
+                              'Use 0 for LINE_NUMBER for the entire secret').format(constants.SHOW_CLIP_LINENUM))
     show.add_argument('-s', '--seconds',
                       dest = 'seconds',
                       type = int,
                       default = constants.CLIP_TIMEOUT,
                       help = ('If copying to the clipboard (see -c/--clip), clear the clipboard after this many '
                               'seconds. Default: {0}').format(constants.CLIP_TIMEOUT))
-
+    show.add_argument('path',
+                      metavar = 'PATH/TO/SECRET',
+                      help = ('The path to the secret'))
+    # VERSION has no args.
+    # IMPORT
+    def_pass_dir = os.path.abspath(os.path.expanduser(os.environ.get('PASSWORD_STORE_DIR', '~/.password-store')))
+    def_gpg_dir = os.path.abspath(os.path.expanduser(constants.SELECTED_GPG_HOMEDIR))
+    importvault.add_argument('-d', '--directory',
+                             default = def_pass_dir,
+                             metavar = '/PATH/TO/PASSWORD_STORE/DIR',
+                             dest = 'pass_dir',
+                             help = ('The path to your Pass data directory. Default: {0}').format(def_pass_dir))
+    importvault.add_argument('-k', '--gpg-key-id',
+                             metavar = 'KEY_ID',
+                             dest = 'key_id',
+                             default = constants.PASS_KEY,
+                             help = ('The GPG key ID to use. Default: {0}. '
+                                     '(If None, the default is to first check /PATH/TO/PASSWORD_STORE/DIR/.gpg-id if '
+                                     'it exists, otherwise use the '
+                                     'first private key we find)').format(constants.PASS_KEY))
+    importvault.add_argument('-H', '--gpg-homedir',
+                             default = def_gpg_dir,
+                             dest = 'gpghome',
+                             metavar = '/PATH/TO/GNUPG/HOMEDIR',
+                             help = ('The GnuPG "homedir". Default: {0}').format(def_gpg_dir))
+    importvault.add_argument('-f', '--force',
+                             dest = 'force',
+                             action = 'store_true',
+                             help = ('If specified, overwrite the destination in Vault.'))
+    importvault.add_argument('mount',
+                             metavar = 'MOUNT_NAME',
+                             help = 'The mount name in Vault to import into (Pass\' hierarchy will be recreated). '
+                                    'This mount MUST exist first and MUST be KV2 if auth is provided that does not '
+                                    'have CREATE access on /sys/mounts!')
     return(args)
