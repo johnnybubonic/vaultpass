@@ -18,8 +18,17 @@ class GPG(object):
 
     def decrypt(self, fpath):
         fpath = os.path.abspath(os.path.expanduser(fpath))
+        _logger.debug('Opening {0} for decryption'.format(fpath))
         with open(fpath, 'rb') as fh:
-            iobuf = io.BytesIO(fh.read())
+            data = fh.read()
+        decrypted = self.decryptData(data)
+        return(decrypted)
+
+    def decryptData(self, data):
+        if isinstance(data, str):
+            data = data.encode('utf-8')
+        _logger.debug('Decrypting {0} bytes'.format(len(data)))
+        iobuf = io.BytesIO(data)
         iobuf.seek(0, 0)
         rslt = self.gpg.decrypt(iobuf)
         decrypted = rslt[0]

@@ -1,15 +1,23 @@
+import copy
 import logging
 import re
 import shutil
+import time
 import warnings
 ##
 import dpath.util  # https://pypi.org/project/dpath/
 import hvac.exceptions
+##
+from . import constants
 
 
 _logger = logging.getLogger()
 _mount_re = re.compile(r'^(?P<mount>.*)/$')
 _subpath_re = re.compile(r'^/?(?P<path>.*)/$')
+_kv_re = re.compile(r'^kv(?:-v)?(?P<version>[0-9]+)$')
+
+
+# TODO: for all write operations, modify handler call to first check if path exists and patch if it does?
 
 
 class CubbyHandler(object):
@@ -30,6 +38,18 @@ class CubbyHandler(object):
         resp = self.client._adapter.get(url = uri)
         return(resp.json())
 
+    def write_secret(self, path, secret, mount_point = 'cubbyhole'):
+        path = path.lstrip('/')
+        args = {'path': '/'.join((mount_point, path))}
+        for k, v in secret.items():
+            if k in args.keys():
+                _logger.error('Cannot use reserved secret name')
+                _logger.debug('Cannot use secret name {0} as it is reserved'.format(k))
+                raise ValueError('Cannot use reserved secret name')
+            args[k] = v
+        resp = self.client.write(**args)
+        return(resp)
+
 
 class MountHandler(object):
     internal_mounts = ('identity', 'sys')
@@ -42,6 +62,38 @@ class MountHandler(object):
         self.paths = {}
         self.getSysMounts()
 
+    def createMount(self, mount_name, mount_type = 'kv2'):
+        orig_mtype = mount_type
+        if mount_type not in constants.SUPPORTED_ENGINES:
+            _logger.error('Invalid mount type')
+            _logger.debug(('The mount type {0} is invalid. '
+                           'It must be one of: {1}').format(mount_type, ', '.join(constants.SUPPORTED_ENGINES)))
+            raise ValueError('Invalid mount type')
+        options = {}
+        r = _kv_re.search(mount_type)
+        if r:
+            mount_type = 'kv'
+            options['version'] = r.groupdict()['version']
+        created = False
+        try:
+            self.client.sys.enable_secrets_engine(mount_type,
+                                                  path = mount_name,
+                                                  description = 'Created automatically by VaultPass',
+                                                  options = options)
+            created = True
+        except hvac.exceptions.InvalidPath as e:
+            _logger.error('Invalid path')
+            _logger.debug('The mount path {0} (type {1}) is invalid: {2}'.format(mount_name, orig_mtype, e))
+            raise ValueError('Invalid path')
+        except hvac.exceptions.InvalidRequest as e:
+            _logger.error('Invalid request; does mount already exist?')
+            _logger.debug(('The creation of mount path {0} (type {1}) generated an invalid request: '
+                           '{2}. Does it already exist?').format(mount_name, orig_mtype, e))
+        # Due to how KV2 is created, we can hit a timing/race condition.
+        if orig_mtype == 'kv2' and created:
+            time.sleep(2)
+        return(created)
+
     def getMountType(self, mount):
         if not self.mounts:
             self.getSysMounts()
@@ -53,7 +105,19 @@ class MountHandler(object):
         return(mtype)
 
     def getSecret(self, path, mount, version = None):
-        pass
+        if not self.mounts:
+            self.getSysMounts()
+        mtype = self.getMountType(mount)
+        args = {}
+        handler = None
+        if mtype == 'cubbyhole':
+            handler = self.cubbyhandler.read_secret
+        elif mtype == 'kv1':
+            handler = self.client.secrets.kv.v1.read_secret
+        if mtype == 'kv2':
+            args['version'] = version
+        data = self.client.secrets
+        # TODO
 
     def getSecretNames(self, path, mount, version = None):
         reader = None
@@ -214,6 +278,3 @@ class MountHandler(object):
         elif not output:
             return(str(self.paths))
         return(None)
-
-    def search(self):
-        pass

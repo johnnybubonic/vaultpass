@@ -217,6 +217,9 @@ class VaultSpawner(object):
         return(None)
 
     def cleanup(self):
+        self._connCheck(bind = False)
+        if self.is_running:
+            return(None)
         storage = self.conf.get('storage', {}).get('file', {}).get('path')
         if not storage:
             return(None)
@@ -249,7 +252,7 @@ class VaultSpawner(object):
             mounts['secret'] = 'kv2'
             mounts['secret_legacy'] = 'kv1'
         for idx, (mname, mtype) in enumerate(mounts.items()):
-            opts = None
+            opts = {}
             orig_mtype = mtype
             if mtype.startswith('kv'):
                 opts = {'version': re.sub(r'^kv([0-9]+)$', r'\g<1>', mtype)}
@@ -259,9 +262,12 @@ class VaultSpawner(object):
                                                       path = mname,
                                                       description = 'Testing mount ({0})'.format(mtype),
                                                       options = opts)
-            except hvac.exceptions.InvalidRequest:
+                # We might have some issues writing secrets on fast machines.
+                time.sleep(2)
+            except hvac.exceptions.InvalidRequest as e:
                 # It probably already exists.
-                pass
+                print('Exception creating {0}: {1} ({2})'.format(mname, e, e.__class__))
+                print(opts)
             if orig_mtype not in ('kv1', 'kv2', 'cubbyhole'):
                 continue
             args = {'path': 'test_secret{0}/foo{1}'.format(idx, mname),
@@ -279,11 +285,12 @@ class VaultSpawner(object):
             elif orig_mtype == 'kv2':
                 handler = self.client.secrets.kv.v2.create_or_update_secret
             try:
-                handler(**args)
+                resp = handler(**args)
             except hvac.exceptions.InvalidPath:
                 print('{0} path invalid'.format(args['path']))
             except Exception as e:
-                print('Exception: {0} ({1})'.format(e, e.__class__))
+                print('Exception creating {0} on {1}: {2} ({3})'.format(args['path'], args['mount_point'], e, e.__class__))
+                print(args)
         return(None)
 
     def start(self):
@@ -324,8 +331,9 @@ class VaultSpawner(object):
         if self.cmd:
             self.cmd.kill()
         else:
-            import signal
-            os.kill(self.pid, signal.SIGKILL)
+            if self.pid:
+                import signal
+                os.kill(self.pid, signal.SIGKILL)
         return(None)
 
 
@@ -337,7 +345,7 @@ def parseArgs():
                       help = ('If specified, do not populate with test data (if it doesn\'t exist)'))
     args.add_argument('-d', '--delete',
                       dest = 'delete_storage',
-                      action = 'store_false',
+                      action = 'store_true',
                       help = ('If specified, delete the storage backend first so a fresh instance is created'))
     args.add_argument('-c', '--cleanup',
                       dest = 'cleanup',
@@ -368,8 +376,9 @@ def main():
             s.populate()
     elif args.oper == 'stop':
         s.stop()
-    if args.cleanup:
-        s.cleanup()
+        if args.cleanup:
+            time.sleep(2)
+            s.cleanup()
     return(None)
 
 

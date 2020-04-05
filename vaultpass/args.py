@@ -18,9 +18,8 @@ def parseArgs():
                       help = ('The path to your configuration file. Default: ~/.config/vaultpass.xml'))
     args.add_argument('-m', '--mount',
                       dest = 'mount',
-                      required = False,
-                      help = ('The mount to use in OPERATION. If not specified, assume all mounts we have access '
-                              'to/all mounts specified in -c/--config'))
+                      default = 'secret',
+                      help = ('The mount to use in OPERATION. If not specified, assume a mount named "secret"'))
     # I wish argparse supported default subcommands. It doesn't as of python 3.8.
     subparser = args.add_subparsers(help = ('Operation to perform'),
                                     metavar = 'OPERATION',
@@ -78,10 +77,16 @@ def parseArgs():
                                        description = ('Import your existing Pass into Vault'),
                                        help = ('Import your existing Pass into Vault'))
     # CP/COPY
+    # vp.copySecret()
     cp.add_argument('-f', '--force',
                     dest = 'force',
                     action = 'store_true',
                     help = ('If specified, replace NEWPATH if it exists'))
+    cp.add_argument('-m', '--mount',
+                    dest = 'newmount',
+                    nargs = 1,
+                    required = False,
+                    help = ('The mount for the destination. Default is to use the main command\'s -m/--mount'))
     cp.add_argument('oldpath',
                     metavar = 'OLDPATH',
                     help = ('The original ("source") path for the secret'))
@@ -89,6 +94,7 @@ def parseArgs():
                     metavar = 'NEWPATH',
                     help = ('The new ("destination") path for the secret'))
     # EDIT
+    # vp.editSecret()
     edit.add_argument('-e', '--editor',
                       metavar = '/PATH/TO/EDITOR',
                       dest = 'editor',
@@ -100,10 +106,12 @@ def parseArgs():
                       help = ('Insert a new secret at PATH_TO_SECRET if it does not exist, otherwise edit it using '
                               'your default editor (see -e/--editor)'))
     # FIND/SEARCH
+    # vp.searchSecretNames()
     find.add_argument('pattern',
                       metavar = 'NAME_PATTERN',
                       help = ('List secrets\' paths whose names match the regex NAME_PATTERN'))
     # GENERATE
+    # vp.generateSecret()
     # TODO: feature parity with passgen (spaces? etc.)
     gen.add_argument('-n', '--no-symbols',
                      dest = 'symbols',
@@ -160,6 +168,7 @@ def parseArgs():
                      metavar = 'dummy',
                      help = ('(Unused; kept for compatibility reasons)'))
     # GREP
+    # vp.searchSecrets()
     # I wish argparse supported arbitrary arguments.
     # It *KIND* of does: https://stackoverflow.com/a/37367814/733214 but then I wouldn't be able to properly grab the
     # regex pattern without more hackery. So here's to wasting my life.
@@ -323,6 +332,7 @@ def parseArgs():
                       help = ('Regex pattern to search passwords'))
     # HELP has no arguments.
     # INIT
+    # vp.initVault()
     initvault.add_argument('-p', '--path',
                            dest = 'path',
                            help = ('(Dummy option; kept for compatibility reasons)'))
@@ -330,6 +340,7 @@ def parseArgs():
                            dest = 'gpg_id',
                            help = ('(Dummy option; kept for compatibility reasons)'))
     # INSERT
+    # vp.insertSecret()
     # TODO: if -e/--echo is specified and sys.stdin, use sys.stdin rather than prompt
     insertval.add_argument('-e', '--echo',
                            dest = 'allow_shouldersurf',
@@ -348,11 +359,30 @@ def parseArgs():
                            action = 'store_false',
                            help = ('If specified, disable password prompt confirmation. '
                                    'Has no effect if -e/--echo is specified'))
+    insertval.add_argument('path',
+                           metavar = 'PATH/TO/SECRET',
+                           help = ('The path to the secret'))
     # LS
+    # vp.listSecretNames()/vp.mount.print() ?
+    ls.add_argument('-o', '--output',
+                    dest = 'output',
+                    choices = constants.SUPPORTED_OUTPUT_FORMATS,
+                    metavar = 'OUTPUT_FORMAT',
+                    help = ('The format to output the hierarchy in. '
+                            'If specified, must be one of: {0} '
+                            '(the default is a condensed python '
+                            'dict repr)').format(', '.join(constants.SUPPORTED_OUTPUT_FORMATS)))
+    ls.add_argument('-i', '--indent',
+                    type = int,
+                    default = 4,
+                    dest = 'indent',
+                    help = ('If -o/--output is "pretty", "yaml", or "json", specify the indent level. '
+                            'Default is 4'))
     ls.add_argument('path',
                     metavar = 'PATH/TO/TREE/BASE',
                     help = ('List names of secrets recursively, starting at PATH/TO/TREE/BASE'))
     # MV
+    # vp.copySecret(remove_old = True)
     mv.add_argument('-f', '--force',
                     dest = 'force',
                     action = 'store_true',
@@ -364,6 +394,7 @@ def parseArgs():
                     metavar = 'NEWPATH',
                     help = ('The new ("destination") path for the secret'))
     # RM
+    # vp.deleteSecret()
     # Is this argument even sensible since it isn't a filesystem?
     rm.add_argument('-r', '--recursive',
                     dest = 'recurse',
@@ -377,6 +408,8 @@ def parseArgs():
                     metavar = 'PATH/TO/SECRET',
                     help = ('The path to the secret or subdirectory'))
     # SHOW
+    # vp.getSecret() ? plus QR etc. printing
+    # TODO: does the default overwrite the None if not specified?
     show.add_argument('-c', '--clip',
                       nargs = '?',
                       type = int,
@@ -387,6 +420,7 @@ def parseArgs():
                               'clipboard instead of printing it. '
                               'Use 0 for LINE_NUMBER for the entire secret').format(constants.SHOW_CLIP_LINENUM))
     show.add_argument('-q', '--qrcode',
+                      dest = 'qr',
                       nargs = '?',
                       type = int,
                       metavar = 'LINE_NUMBER',
@@ -406,26 +440,18 @@ def parseArgs():
                       help = ('The path to the secret'))
     # VERSION has no args.
     # IMPORT
-    def_pass_dir = os.path.abspath(os.path.expanduser(os.environ.get('PASSWORD_STORE_DIR', '~/.password-store')))
-    def_gpg_dir = os.path.abspath(os.path.expanduser(constants.SELECTED_GPG_HOMEDIR))
+    # vp.convert()
     importvault.add_argument('-d', '--directory',
-                             default = def_pass_dir,
+                             default = constants.PASS_DIR,
                              metavar = '/PATH/TO/PASSWORD_STORE/DIR',
                              dest = 'pass_dir',
-                             help = ('The path to your Pass data directory. Default: {0}').format(def_pass_dir))
-    importvault.add_argument('-k', '--gpg-key-id',
-                             metavar = 'KEY_ID',
-                             dest = 'key_id',
-                             default = constants.PASS_KEY,
-                             help = ('The GPG key ID to use. Default: {0}. '
-                                     '(If None, the default is to first check /PATH/TO/PASSWORD_STORE/DIR/.gpg-id if '
-                                     'it exists, otherwise use the '
-                                     'first private key we find)').format(constants.PASS_KEY))
+                             help = ('The path to your Pass data directory. Default: {0}').format(constants.PASS_DIR))
     importvault.add_argument('-H', '--gpg-homedir',
-                             default = def_gpg_dir,
+                             default = constants.GPG_HOMEDIR,
                              dest = 'gpghome',
                              metavar = '/PATH/TO/GNUPG/HOMEDIR',
-                             help = ('The GnuPG "homedir". Default: {0}').format(def_gpg_dir))
+                             help = ('The GnuPG "homedir". It MUST contain the private key that Pass uses. '
+                                     'Default: {0}').format(constants.GPG_HOMEDIR))
     importvault.add_argument('-f', '--force',
                              dest = 'force',
                              action = 'store_true',

@@ -4,6 +4,8 @@ import string
 # These are static.
 NAME = 'VaultPass'
 VERSION = '0.0.1'
+SUPPORTED_ENGINES = ('kv1', 'kv2', 'cubbyhole')
+SUPPORTED_OUTPUT_FORMATS = ('pretty', 'yaml', 'json')
 ALPHA_LOWER_PASS_CHARS = string.ascii_lowercase
 ALPHA_UPPER_PASS_CHARS = string.ascii_uppercase
 ALPHA_PASS_CHARS = ALPHA_LOWER_PASS_CHARS + ALPHA_UPPER_PASS_CHARS
@@ -19,9 +21,9 @@ SELECTED_PASS_NOSYMBOL_CHARS = ALPHANUM_PASS_CHARS
 CLIPBOARD = 'clipboard'
 GENERATED_LENGTH = 25  # I personally would prefer 32, but Pass compatibility...
 EDITOR = 'vi'  # vi is on ...every? single distro and UNIX/UNIX-like, to my knowledge.
-PASS_KEY = None
 GPG_HOMEDIR = '~/.gnupg'
 SELECTED_GPG_HOMEDIR = GPG_HOMEDIR
+PASS_DIR = '~/.password-store'
 
 if not os.environ.get('NO_VAULTPASS_ENVS'):
     # These are dynamically generated from the environment.
@@ -32,5 +34,9 @@ if not os.environ.get('NO_VAULTPASS_ENVS'):
     CLIPBOARD = os.environ.get('PASSWORD_STORE_X_SELECTION', CLIPBOARD)
     GENERATED_LENGTH = int(os.environ.get('PASSWORD_STORE_GENERATED_LENGTH', GENERATED_LENGTH))
     EDITOR = os.environ.get('EDITOR', EDITOR)
-    PASS_KEY = os.environ.get('PASSWORD_STORE_KEY', PASS_KEY)
     SELECTED_GPG_HOMEDIR = os.environ.get('GNUPGHOME', GPG_HOMEDIR)
+    PASS_DIR = os.environ.get('PASSWORD_STORE_DIR', PASS_DIR)
+
+# These are made more sane.
+PASS_DIR = os.path.abspath(os.path.expanduser(PASS_DIR))
+SELECTED_GPG_HOMEDIR = os.path.abspath(os.path.expanduser(SELECTED_GPG_HOMEDIR))

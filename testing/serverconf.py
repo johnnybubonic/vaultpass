@@ -15,6 +15,7 @@ default_conf = {'listener': [
                 'storage': {'file': {'path': './data'}},
                 'log_level': 'Debug',  # highest is 'Trace'
                 'pid_file': './test.pid',
+                'disable_mlock': True,
                 'raw_storage_endpoint': True,
                 'log_format': 'json',  # or String
                 'ui': True}

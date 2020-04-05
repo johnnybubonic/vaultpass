@@ -8,11 +8,12 @@ from . import auth
 from . import clipboard
 from . import config
 from . import constants
+from . import gpg_handler
 from . import mounts
 from . import pass_import
 
 
-class PassMan(object):
+class VaultPass(object):
     client = None
     auth = None
     uri = None
@@ -64,6 +65,61 @@ class PassMan(object):
         _logger.debug('Set URI to {0}'.format(self.uri))
         return(None)
 
+    def convert(self,
+                mount,
+                force = False,
+                gpghome = constants.GPG_HOMEDIR,
+                pass_dir = constants.PASS_DIR,
+                *args, **kwargs):
+        pass  # TODO
+
+    def copySecret(self, oldpath, newpath, mount, newmount, force = False, remove_old = False, *args, **kwargs):
+        pass  # TODO
+
+        if remove_old:
+            self.deleteSecret(oldpath, mount, force = force)
+        return(None)
+
+    def createSecret(self, secret_dict, path, mount_name, *args, **kwargs):
+        mtype = self.mount.mounts.get(mount_name)
+        handler = None
+        if not mtype:
+            _logger.error('Could not determine mount type')
+            _logger.debug('Could not determine mount type for mount {0}'.format(mount_name))
+            raise RuntimeError('Could not determine mount type')
+        args = {'path': path,
+                'mount_point': mount_name,
+                'secret': secret_dict}
+        if mtype == 'cubbyhole':
+            handler = self.mount.cubbyhandler.write_secret
+        elif mtype == 'kv1':
+            handler = self.client.secrets.kv.v1.create_or_update_secret
+        elif mtype == 'kv2':
+            handler = self.client.secrets.kv.v2.create_or_update_secret
+        resp = handler(**args)
+        return(resp)
+
+    def deleteSecret(self, path, mount_name, force = False, recursive = False, *args, **kwargs):
+        pass  # TODO
+
+    def editSecret(self, path, mount, editor = constants.EDITOR, *args, **kwargs):
+        pass  # TODO
+
+    def generateSecret(self,
+                       path,
+                       mount,
+                       symbols = True,
+                       clip = False,
+                       seconds = constants.CLIP_TIMEOUT,
+                       chars = constants.SELECTED_PASS_CHARS,
+                       chars_plain = constants.SELECTED_PASS_NOSYMBOL_CHARS,
+                       in_place = False,
+                       qr = False,
+                       force = False,
+                       length = constants.GENERATED_LENGTH,
+                       *args, **kwargs):
+        pass  # TODO
+
     def getClient(self):
         auth_xml = self.cfg.xml.find('.//auth')
         if auth_xml is None:
@@ -95,3 +151,28 @@ class PassMan(object):
             _logger.error('Not initialized')
             raise RuntimeError('Not initialized')
         return(None)
+
+    def getSecret(self, path, mount, clip = None, qr = None, seconds = constants.CLIP_TIMEOUT, *args, **kwargs):
+        pass  # TODO
+
+    def initVault(self, *args, **kwargs):
+        pass  # TODO
+
+    def insertSecret(self,
+                     path,
+                     mount,
+                     allow_shouldersurf = False,
+                     multiline = False,
+                     force = False,
+                     confirm = True,
+                     *args, **kwargs):
+        pass  # TODO
+
+    def listSecretNames(self, path, mount, output = None, indent = 4, *args, **kwargs):
+        pass  # TODO
+
+    def searchSecrets(self, pattern, mount, *args, **kwargs):
+        pass  # TODO
+
+    def searchSecretNames(self, pattern, mount, *args, **kwargs):
+        pass  # TODO
