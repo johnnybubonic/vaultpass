@@ -26,6 +26,10 @@ class CubbyHandler(object):
     def __init__(self, client):
         self.client = client
 
+    def create_or_update_secret(self, *args, **kwargs):
+        # Alias function
+        return(self.write_secret(*args, **kwargs))
+
     def list_secrets(self, path, mount_point = 'cubbyhole'):
         path = path.lstrip('/')
         uri = '/v1/{0}/{1}'.format(mount_point, path)
@@ -34,11 +38,12 @@ class CubbyHandler(object):
 
     def read_secret(self, path, mount_point = 'cubbyhole'):
         path = path.lstrip('/')
-        uri = '/v1/{0}/{1}'.format(mount_point, path)
+        # uri = '/v1/{0}/{1}'.format(mount_point, path)
+        uri = '{0}/{1}'.format(mount_point, path)
         resp = self.client._adapter.get(url = uri)
         return(resp.json())
 
-    def write_secret(self, path, secret, mount_point = 'cubbyhole'):
+    def write_secret(self, path, secret, mount_point = 'cubbyhole', *args, **kwargs):
         path = path.lstrip('/')
         args = {'path': '/'.join((mount_point, path))}
         for k, v in secret.items():
@@ -103,6 +108,14 @@ class MountHandler(object):
             _logger.debug('The mount {0} was not found in the defined mounts.'.format(mount))
             raise ValueError('Mount not found in defined mounts')
         return(mtype)
+
+    def getPath(self, path, mount):
+        relpath = path.lstrip('/')
+        fullpath = '/'.join((mount, relpath))
+        if not self.paths:
+            self.getSecretsTree()
+        obj = dpath.util.get(self.paths, fullpath, None)
+        return(obj)
 
     def getSecret(self, path, mount, version = None):
         if not self.mounts:

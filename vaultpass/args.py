@@ -408,7 +408,7 @@ def parseArgs():
                     metavar = 'PATH/TO/SECRET',
                     help = ('The path to the secret or subdirectory'))
     # SHOW
-    # vp.getSecret() ? plus QR etc. printing
+    # vp.getSecret(printme = True)
     # TODO: does the default overwrite the None if not specified?
     show.add_argument('-c', '--clip',
                       nargs = '?',
@@ -424,11 +424,10 @@ def parseArgs():
                       nargs = '?',
                       type = int,
                       metavar = 'LINE_NUMBER',
-                      default = constants.SHOW_CLIP_LINENUM,
-                      help = ('If specified, do not print the secret at line number LINE_NUMBER (Default: {0}) but '
-                              'instead generate a QR code of it (either graphically or in-terminal depending on '
-                              'environment). '
-                              'Use 0 for LINE_NUMBER for the entire secret').format(constants.SHOW_CLIP_LINENUM))
+                      default = None,
+                      help = ('If specified, do not print the secret but instead generate a QR code of it (either '
+                              'graphically or in-terminal depending on environment). '
+                              'LINE_NUMBER has no effect and is kept for compatibility reasons'))
     show.add_argument('-s', '--seconds',
                       dest = 'seconds',
                       type = int,

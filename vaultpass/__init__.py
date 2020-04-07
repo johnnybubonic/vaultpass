@@ -1,8 +1,13 @@
 import logging
+import tempfile
 import os
+import subprocess
 ##
 from . import logger
 _logger = logging.getLogger('VaultPass')
+##
+import hvac.exceptions
+##
 from . import args
 from . import auth
 from . import clipboard
@@ -11,6 +16,7 @@ from . import constants
 from . import gpg_handler
 from . import mounts
 from . import pass_import
+from . import QR
 
 
 class VaultPass(object):
@@ -19,7 +25,8 @@ class VaultPass(object):
     uri = None
     mount = None
 
-    def __init__(self, cfg = '~/.config/vaultpass.xml'):
+    def __init__(self, mount, cfg = '~/.config/vaultpass.xml'):
+        self.mname = mount
         self.cfg = config.getConfig(cfg)
         self._getURI()
         self.getClient()
@@ -44,9 +51,48 @@ class VaultPass(object):
             raise RuntimeError('Unable to unseal')
         return(None)
 
+    def _getHandler(self, mount = None, func = 'read', *args, **kwargs):
+        if func not in ('read', 'write', 'list'):
+            _logger.error('Invalid func')
+            _logger.debug('Invalid func; must be one of: read, write, list, update')
+            raise ValueError('Invalid func')
+        if not mount:
+            mount = self.mname
+        mtype = self.mount.getMountType(mount)
+        handler = None
+        if mtype == 'cubbyhole':
+            if func == 'read':
+                handler = self.mount.cubbyhandler.read_secret
+            elif func == 'write':
+                handler = self.mount.cubbyhandler.write_secret
+            elif func == 'list':
+                handler = self.mount.cubbyhandler.list_secrets
+        elif mtype == 'kv1':
+            if func == 'read':
+                handler = self.client.secrets.kv.v1.read_secret
+            elif func == 'write':
+                handler = self.client.secrets.kv.v1.create_or_update_secret
+            elif func == 'list':
+                handler = self.client.secrets.kv.v1.list_secrets
+        elif mtype == 'kv2':
+            if func == 'read':
+                handler = self.client.secrets.kv.v2.read_secret_version
+            elif func == 'write':
+                handler = self.client.secrets.kv.v2.create_or_update_secret
+            elif func == 'list':
+                handler = self.client.secrets.kv.v2.list_secrets
+        if not handler:
+            _logger.error('Could not get handler')
+            _logger.debug('Could not get handler for mount {0}'.format(mount))
+            raise RuntimeError('Could not get handler')
+        return(handler)
+
     def _getMount(self):
         mounts_xml = self.cfg.xml.find('.//mounts')
         self.mount = mounts.MountHandler(self.client, mounts_xml = mounts_xml)
+        if self.mname:
+            # Check that the mount exists
+            self.mount.getMountType(self.mname)
         return(None)
 
     def _getURI(self):
@@ -65,6 +111,14 @@ class VaultPass(object):
         _logger.debug('Set URI to {0}'.format(self.uri))
         return(None)
 
+    def _pathExists(self, path, mount = None, *args, **kwargs):
+        if not mount:
+            mount = self.mname
+        exists = False
+        if self.mount.getPath(path, mount):
+            exists = True
+        return(exists)
+
     def convert(self,
                 mount,
                 force = False,
@@ -74,7 +128,15 @@ class VaultPass(object):
         pass  # TODO
 
     def copySecret(self, oldpath, newpath, mount, newmount, force = False, remove_old = False, *args, **kwargs):
-        pass  # TODO
+        mtype = self.mount.getMountType(mount)
+        oldexists = self._pathExists(oldpath, mount = mount)
+        if not oldexists:
+            _logger.error('oldpath does not exist')
+            _logger.debug('The oldpath {0} does not exist'.format(oldpath))
+            raise ValueError('oldpath does not exist')
+        data = self.getSecret(oldpath, mount)
+        # TODO: left off here
+        newexists = self._pathExists(newpath, mount = mount)
 
         if remove_old:
             self.deleteSecret(oldpath, mount, force = force)
@@ -152,8 +214,63 @@ class VaultPass(object):
             raise RuntimeError('Not initialized')
         return(None)
 
-    def getSecret(self, path, mount, clip = None, qr = None, seconds = constants.CLIP_TIMEOUT, *args, **kwargs):
-        pass  # TODO
+    def getSecret(self,
+                  path,
+                  mount,
+                  kname = None,
+                  clip = None,
+                  qr = None,
+                  seconds = constants.CLIP_TIMEOUT,
+                  printme = False,
+                  *args, **kwargs):
+        mtype = self.mount.getMountType(mount)
+        args = {'path': path,
+                'mount_point': mount}
+        handler = self._getHandler(mount, func = 'read')
+        try:
+            data = handler(**args)
+            if mtype in ('cubbyhole', 'kv1'):
+                data = data['data']
+            elif mtype == 'kv2':
+                data = data['data']['data']
+            if kname:
+                data = data.get(kname)
+        except hvac.exceptions.InvalidPath as e:
+            lpath = path.split('/')
+            path = '/'.join(lpath[0:-1])
+            args = {'path': path,
+                    'kname': lpath[-1],
+                    'mount': mount,
+                    'clip': clip,
+                    'qr': qr,
+                    'seconds': seconds,
+                    'printme': printme}
+            data = self.getSecret(**args)
+        if qr is not None:
+            data, has_x = QR.genQr(data, image = True)
+            if has_x:
+                fpath = tempfile.mkstemp(prefix = '.vaultpass.qr.', suffix = '.svg', dir = '/dev/shm')[1]
+                _logger.debug('Writing to {0} so it can be displayed'.format(fpath))
+                with open(fpath, 'wb') as fh:
+                    fh.write(data.read())
+                if printme:
+                    _logger.debug('Opening {0} in the default image viwer application'.format(fpath))
+                    cmd = subprocess.run(['xdg-open', fpath], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+                    if cmd.returncode != 0:
+                        _logger.error('xdg-open returned non-zero status code')
+                        for x in ('stdin', 'stdout'):
+                            o = getattr(cmd, x)
+                            if not o:
+                                continue
+                            o = o.decode('utf-8').strip()
+                            if o != '':
+                                _logger.debug('{0}: {1}'.format(x.upper(), o))
+                    os.remove(fpath)
+            elif printme:
+                print(data.read())
+        data.seek(0, 0)
+        # TODO: clip, etc.
+        return(data)
 
     def initVault(self, *args, **kwargs):
         pass  # TODO
