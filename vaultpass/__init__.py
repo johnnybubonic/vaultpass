@@ -246,15 +246,18 @@ class VaultPass(object):
                     'seconds': seconds,
                     'printme': printme}
             data = self.getSecret(**args)
-        if qr is not None:
-            data, has_x = QR.genQr(data, image = True)
+        if qr not in (False, None):
+            qrdata, has_x = QR.genQr(data, image = True)
             if has_x:
                 fpath = tempfile.mkstemp(prefix = '.vaultpass.qr.', suffix = '.svg', dir = '/dev/shm')[1]
                 _logger.debug('Writing to {0} so it can be displayed'.format(fpath))
                 with open(fpath, 'wb') as fh:
-                    fh.write(data.read())
+                    fh.write(qrdata.read())
                 if printme:
                     _logger.debug('Opening {0} in the default image viwer application'.format(fpath))
+                    # We intentionally want this to block, as most image viewers will
+                    # unload the image once the file is deleted and we can probably
+                    # elete it before the user can save it elsewhere or scan it with their phone.
                     cmd = subprocess.run(['xdg-open', fpath], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
                     if cmd.returncode != 0:
                         _logger.error('xdg-open returned non-zero status code')
@@ -267,10 +270,10 @@ class VaultPass(object):
                                 _logger.debug('{0}: {1}'.format(x.upper(), o))
                     os.remove(fpath)
             elif printme:
-                print(data.read())
-        data.seek(0, 0)
-        # TODO: clip, etc.
-        clipboard.pasteClipboard(printme = printme)
+                print(qrdata.read())
+            qrdata.seek(0, 0)
+        if clip not in (False, None):
+            clipboard.pasteClipboard(data, seconds = seconds, clipboard = clipboard, printme = printme)
         return(data)
 
     def initVault(self, *args, **kwargs):

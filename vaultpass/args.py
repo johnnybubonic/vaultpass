@@ -337,7 +337,7 @@ def parseArgs():
                            dest = 'path',
                            help = ('(Dummy option; kept for compatibility reasons)'))
     initvault.add_argument('gpg_id',
-                           dest = 'gpg_id',
+                           metavar = 'GPG_KEY_ID',
                            help = ('(Dummy option; kept for compatibility reasons)'))
     # INSERT
     # vp.insertSecret()
@@ -411,22 +411,14 @@ def parseArgs():
     # vp.getSecret(printme = True)
     # TODO: does the default overwrite the None if not specified?
     show.add_argument('-c', '--clip',
-                      nargs = '?',
-                      type = int,
-                      default = None,
-                      metavar = 'LINE_NUMBER',
+                      action = 'store_true',
                       dest = 'clip',
-                      help = ('If specified, do not print the secret but instead copy it to the clipboard. '
-                              'LINE_NUMBER has no effect and is kept for compatibility reasons'))
+                      help = ('If specified, do not print the secret but instead copy it to the clipboard'))
     show.add_argument('-q', '--qrcode',
                       dest = 'qr',
-                      nargs = '?',
-                      type = int,
-                      metavar = 'LINE_NUMBER',
-                      default = None,
+                      action = 'store_true',
                       help = ('If specified, do not print the secret but instead generate a QR code of it (either '
-                              'graphically or in-terminal depending on environment). '
-                              'LINE_NUMBER has no effect and is kept for compatibility reasons'))
+                              'graphically or in-terminal depending on environment)'))
     show.add_argument('-s', '--seconds',
                       dest = 'seconds',
                       type = int,

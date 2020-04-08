@@ -445,6 +445,20 @@ configuration can be either specified in the <<configuration,configuration file>
 flags/switches to subcommands. **Some** configuration directives/behaviour may be overridden by environment variables
 where supported by Vault/Pass upstream configuration.
 
+=== Vault Paths Don't Match VaultPass' Paths
+=== Issue Description
+Pass and Vault have fundamentally different storage ideas. Pass secrets/passwords are, once decrypted, just plaintext
+blobs. Vault, on the other hand, uses a key/value type of storage. As a result, this means two things:
+
+* The last item in a path in VaultPass is the key name (e.g. the path `foo/bar/baz` in VaultPass would be a Vault path
+of `foo/bar`, which would then have a **key** named `baz`), and
+* The **`line-number`** sub-argument is completely irrelevant for things like copying to the clipboard and generating a
+QR code (e.g. as in `pass show --clip`**`=line-number`**).
+
+==== Workaround(s)
+None, aside from not using the `line-number` sub-argument since it's no longer relevant. (You'll get an error if you
+do.)
+
 
 == Submitting a Bug Report/Feature Request
 Please use https://bugs.square-r00t.net/index.php?do=newtask&project=13[my bugtracker^].
