@@ -18,6 +18,8 @@ SHOW_CLIP_LINENUM = 1
 CLIP_TIMEOUT = 45
 SELECTED_PASS_CHARS = ALL_PASS_CHARS
 SELECTED_PASS_NOSYMBOL_CHARS = ALPHANUM_PASS_CHARS
+# xclip(1)
+ALLOWED_CLIPBOARDS = ('primary', 'secondary', 'clipboard')
 CLIPBOARD = 'clipboard'
 GENERATED_LENGTH = 25  # I personally would prefer 32, but Pass compatibility...
 EDITOR = 'vi'  # vi is on ...every? single distro and UNIX/UNIX-like, to my knowledge.

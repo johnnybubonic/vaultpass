@@ -270,6 +270,7 @@ class VaultPass(object):
                 print(data.read())
         data.seek(0, 0)
         # TODO: clip, etc.
+        clipboard.pasteClipboard(printme = printme)
         return(data)
 
     def initVault(self, *args, **kwargs):

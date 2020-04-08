@@ -1,4 +1,5 @@
 import io
+import json
 import os
 import subprocess
 import logging
@@ -21,6 +22,10 @@ except ImportError:
 
 
 def genQr(data, image = False):
+    if isinstance(data, dict):
+        data = json.dumps(dict, indent = 4)
+    if not isinstance(data, str):
+        data = str(data)
     _logger.debug('Generating QR code')
     qr = qrcode.QRCode(error_correction = qrcode.constants.ERROR_CORRECT_H)
     qr.add_data(data)

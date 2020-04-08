@@ -413,12 +413,11 @@ def parseArgs():
     show.add_argument('-c', '--clip',
                       nargs = '?',
                       type = int,
-                      default = constants.SHOW_CLIP_LINENUM,
+                      default = None,
                       metavar = 'LINE_NUMBER',
                       dest = 'clip',
-                      help = ('If specified, copy line number LINE_NUMBER (Default: {0}) from the secret to the '
-                              'clipboard instead of printing it. '
-                              'Use 0 for LINE_NUMBER for the entire secret').format(constants.SHOW_CLIP_LINENUM))
+                      help = ('If specified, do not print the secret but instead copy it to the clipboard. '
+                              'LINE_NUMBER has no effect and is kept for compatibility reasons'))
     show.add_argument('-q', '--qrcode',
                       dest = 'qr',
                       nargs = '?',
