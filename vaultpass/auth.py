@@ -1,5 +1,6 @@
 import logging
 import os
+import warnings
 ##
 import hvac
 
@@ -111,7 +112,7 @@ class Token(_AuthBase):
             _logger.debug(('Environment variable {0} was specified as containing the token '
                            'but it is empty').format(env_var))
             _logger.error('Env var not populated')
-            raise RuntimeError('Env var not populated')
+            raise OSError('Env var not populated')
         return(var)
 
     def _getFile(self, fpath):
@@ -122,6 +123,7 @@ class Token(_AuthBase):
 
     def getClient(self):
         _token = self.xml.text
+        chk = True
         if _token is not None:
             self.token = _token
         else:
@@ -134,17 +136,20 @@ class Token(_AuthBase):
                     try:
                         self._getEnv('VAULT_TOKEN')
                         break
-                    except Exception as e:
+                    except OSError as e:
                         pass
                     try:
                         self._getFile('~/.vault-token')
+                        _exhausted = True
                     except Exception as e:
                         _exhausted = True
                 if not self.token:
                     _logger.debug(('Unable to automatically determine token from '
-                                   'environment variable or filesystem defaults'))
-                    _logger.error('Cannot determine token')
-                    raise RuntimeError('Cannot determine token')
+                                   'environment variable or filesystem defaults. Ignore this if you are initializing '
+                                   'Vault.'))
+                    _logger.warning('Cannot determine token')
+                    warnings.warn('Cannot determine token')
+                    chk = False
             else:
                 if a.startswith('env:'):
                     e = a.split(':', 1)
@@ -156,7 +161,8 @@ class Token(_AuthBase):
         _logger.info('Initialized client.')
         self.client.token = self.token
         _logger.debug('Applied token.')
-        self.authCheck()
+        if chk:
+            self.authCheck()
         return(None)
 
 

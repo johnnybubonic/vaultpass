@@ -27,7 +27,8 @@ bash and backed by GPG. It's fairly barebones in terms of technology but does a 
 VaultPass attempts to bridge the gap between the two. It aims to be a drop-in replacement for the pass CLI utility via
 subcommands and other operations, but obviously with Vault as a backend instead of GPG-encrypted flatfile hierarchy.
 
-Obviously since the backends are vastly different, total parity is going to be impossible. But I try to get it pretty close.
+Obviously since the backends are vastly different, total parity is going to be impossible but I try to get it pretty
+close. Important deviations are <<known_incompatibilities_with_pass, documented below>>.
 
 
 == Configuration
@@ -43,13 +44,13 @@ easier. It's *highly* recommended to use them.]
 . The root element (`vaultpass`).
 This element contains attributes describing parsing/validation specifics as well, such as the
 https://www.w3.org/TR/xml-names/[namespace definitions^] and https://www.w3.org/TR/xmlschema11-1/#xsi_schemaLocation[schema location^].footnote:confheader[]
-.. The `server` element.footnote:optelem[This element/attribute/text content is *optional*. See the item's description
-for how default values/behaviour are determined.] This element is a container for connection and management of the
-Vault server. This consists of:
-... A single `uri` element.footnote:optelem[] It should be the same as the **base** URL for your Vault server.
-The default (if not specified) is to first check for a **`VAULT_SERVER`** environment variable and, if not found, to use
+.. The `server` element. This element is a container for connection and management of the
+Vault server and is required (even though it may not have any children). This consists of:
+... A single `uri` element.footnote:optelem[This element/attribute/text content is *optional*. See the item's description
+for how default values/behaviour are determined.] It should be the same as the **base** URL for your Vault server.
+If not specified, the default is to first check for a **`VAULT_ADDR`** environment variable and, if not found, to use
 `http://localhost:8200/`.
-... An unseal directive, which can be used to (attempt to) automatically unseal the server if it is sealed.
+... An unseal elementfootnote:optelem[], which can be used to (attempt to) automatically unseal the server if it is sealed.
 This isn't required, but can assist in automatic operation.
 One of either:footnote:optelem[]
 .... `unseal`, the unseal key shard (a Base64 string), or
@@ -59,6 +60,9 @@ one of either:
 .... `auth` (see <<Auth>> section below), or
 .... `authGpg`, an <<Auth>> config snippet encrypted with GPG. See the section on <<GPG-Encrypted Elements>>.
 ... An optional `mounts` container.footnote:optelem[] See the section on <<Mounts>>.
+
+If you would like to initialize Vault with VaultPass, use a self-enclosed <<token>> auth stanza. It will automatically
+be replaced once a root token is generated.
 
 Let's look at an example configuration.
 
@@ -88,10 +92,11 @@ Let's look at an example configuration.
 </vaultpass>
 ----
 
-In the above, we can see that it would use the vault server at `http://localhost:8200/` using whatever token is either
+In the above, we can see that it would use the Vault server at `http://localhost:8200/` using whatever token is either
 in the **`VAULT_TOKEN`** environment variable or, if empty, the `~/.vault-token` file. Because an unseal shard was
 provided, it will be able to attempt to automatically unseal the Vault (assuming its shard will complete the threshold
-needed). Because we specify mounts, we do not need permissions in Vault to list `/sys/mounts`.
+needed). Because we specify mounts, we do not need permissions in Vault to list `/sys/mounts` (but if our token has
+access to do so per its policy, then any automatically discovered will be added).
 
 === Auth
 Vault itself supports a https://www.vaultproject.io/docs/auth/[large number of authentication methods^]. However, in
@@ -174,6 +179,10 @@ To determine the behaviour of how this behaves, please refer to the below table.
 | 3 |token contained in tags, no `source`| The specified token will be used and no automatic detection will occur.
 | 4 |token contained in tags, `source` given |Same as **3**; `source` is ignored.
 |===
+
+If the Vault instance is not initialized and a `vaultpass init` is called, the configuration file will be updated to
+use token auth, populated with the new root token, and populated with the new unseal shard. (The previous configuration
+file will be backed up first!).
 
 ===== Example Snippet
 [source,xml]
@@ -399,7 +408,7 @@ alias vaultpass='vaultpass -c ~/.config/alternate.vaultpass.xml'
 
 To use the non-aliased command in Bash, you can either invoke the full path:
 
-[source,bash]
+[source]
 ----
 /usr/local/bin/vaultpass edit path/to/secret
 ----
@@ -446,19 +455,33 @@ flags/switches to subcommands. **Some** configuration directives/behaviour may b
 where supported by Vault/Pass upstream configuration.
 
 === Vault Paths Don't Match VaultPass' Paths
-=== Issue Description
+==== Issue Description
 Pass and Vault have fundamentally different storage ideas. Pass secrets/passwords are, once decrypted, just plaintext
 blobs. Vault, on the other hand, uses a key/value type of storage. As a result, this means two things:
 
 * The last item in a path in VaultPass is the key name (e.g. the path `foo/bar/baz` in VaultPass would be a Vault path
 of `foo/bar`, which would then have a **key** named `baz`), and
 * The **`line-number`** sub-argument is completely irrelevant for things like copying to the clipboard and generating a
-QR code (e.g. as in `pass show --clip`**`=line-number`**).
+QR code (e.g. as in `pass show --clip=line-number`).
 
 ==== Workaround(s)
 None, aside from not using the `line-number` sub-argument since it's no longer relevant. (You'll get an error if you
 do.)
 
+=== Unable to specify `line-number`
+See <<vault_paths_dont_match_vaultpass_paths, above>> (_Vault Paths Don't Match VaultPass' Paths_).
+
+=== Deleting Secrets in KV2
+==== Issue Description
+In Pass, because it doesn't have versioning (unless you're using git with your Pass instance). Vault's `kv2` engine,
+however, does have versioning. As a result, once a secret is "deleted", it can still be recovered via
+https://www.vaultproject.io/docs/secrets/kv/kv-v2/#deleting-and-destroying-data[an `undelete` method^]. If you are
+deleting a secret for security reasons, you may want to destroy it instead. VaultPass' delete method uses a delete
+rather than a destroy.
+
+==== Workaround(s)
+VaultPass has a new subcommand, `destroy`, which will remove versioned secrets **permanently**. Use with caution,
+obviously. If called on a non-KV2 mount's path, it will be the same as the `delete` subcommand.
 
 == Submitting a Bug Report/Feature Request
 Please use https://bugs.square-r00t.net/index.php?do=newtask&project=13[my bugtracker^].

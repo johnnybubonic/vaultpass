@@ -43,6 +43,12 @@ class CubbyHandler(object):
         resp = self.client._adapter.get(url = uri)
         return(resp.json())
 
+    def remove_secret(self, path, mount_point = 'cubbyhole', *args, **kwargs):
+        path = path.lstrip('/')
+        uri = '{0}/{1}'.format(mount_point, path)
+        resp = self.client._adapter.delete(url = uri)
+        return(resp.json())
+
     def write_secret(self, path, secret, mount_point = 'cubbyhole', *args, **kwargs):
         path = path.lstrip('/')
         args = {'path': '/'.join((mount_point, path))}

@@ -2,6 +2,7 @@ import logging
 import tempfile
 import os
 import subprocess
+import time
 ##
 from . import logger
 _logger = logging.getLogger('VaultPass')
@@ -25,13 +26,14 @@ class VaultPass(object):
     uri = None
     mount = None
 
-    def __init__(self, mount, cfg = '~/.config/vaultpass.xml'):
-        self.mname = mount
+    def __init__(self, initialize = False, cfg = '~/.config/vaultpass.xml'):
+        self.initialize = initialize
         self.cfg = config.getConfig(cfg)
         self._getURI()
         self.getClient()
-        self._checkSeal()
-        self._getMount()
+        if not self.initialize:
+            self._checkSeal()
+            self._getMount()
 
     def _checkSeal(self):
         _logger.debug('Checking and attempting unseal if necessary and possible.')
@@ -51,48 +53,47 @@ class VaultPass(object):
             raise RuntimeError('Unable to unseal')
         return(None)
 
-    def _getHandler(self, mount = None, func = 'read', *args, **kwargs):
-        if func not in ('read', 'write', 'list'):
+    def _getConfirm(self, msg = None):
+        if not msg:
+            msg = 'Are you sure (y/N)? '
+        confirm = input(msg)
+        confirm = confirm.lower().strip()
+        if confirm.startswith('y'):
+            return(True)
+        return(False)
+
+    def _getHandler(self, mount, func = 'read', *args, **kwargs):
+        if func not in ('read', 'write', 'list', 'delete', 'destroy'):
             _logger.error('Invalid func')
-            _logger.debug('Invalid func; must be one of: read, write, list, update')
+            _logger.debug('Invalid func; must be one of: read, write, list, delete, destroy')
             raise ValueError('Invalid func')
-        if not mount:
-            mount = self.mname
         mtype = self.mount.getMountType(mount)
         handler = None
-        if mtype == 'cubbyhole':
-            if func == 'read':
-                handler = self.mount.cubbyhandler.read_secret
-            elif func == 'write':
-                handler = self.mount.cubbyhandler.write_secret
-            elif func == 'list':
-                handler = self.mount.cubbyhandler.list_secrets
-        elif mtype == 'kv1':
-            if func == 'read':
-                handler = self.client.secrets.kv.v1.read_secret
-            elif func == 'write':
-                handler = self.client.secrets.kv.v1.create_or_update_secret
-            elif func == 'list':
-                handler = self.client.secrets.kv.v1.list_secrets
-        elif mtype == 'kv2':
-            if func == 'read':
-                handler = self.client.secrets.kv.v2.read_secret_version
-            elif func == 'write':
-                handler = self.client.secrets.kv.v2.create_or_update_secret
-            elif func == 'list':
-                handler = self.client.secrets.kv.v2.list_secrets
+        handler_map = {'cubbyhole': {'read': self.mount.cubbyhandler.read_secret,
+                                     'write': self.mount.cubbyhandler.write_secret,
+                                     'list': self.mount.cubbyhandler.list_secrets,
+                                     'delete': self.mount.cubbyhandler.remove_secret,
+                                     'destroy': self.mount.cubbyhandler.remove_secret},
+                       'kv1': {'read': self.client.secrets.kv.v1.read_secret,
+                               'write': self.client.secrets.kv.v1.create_or_update_secret,
+                               'list': self.client.secrets.kv.v1.list_secrets,
+                               'delete': self.client.secrets.kv.v1.delete_secret,
+                               'destroy': self.client.secrets.kv.v1.delete_secret},
+                       'kv2': {'read': self.client.secrets.kv.v2.read_secret_version,
+                               'write': self.client.secrets.kv.v2.create_or_update_secret,
+                               'list': self.client.secrets.kv.v2.list_secrets,
+                               'delete': self.client.secrets.kv.v2.delete_secret_versions,
+                               'destroy': self.client.secrets.kv.v2.destroy_secret_versions}}
+        handler = handler_map.get(mtype, {}).get(func, None)
         if not handler:
             _logger.error('Could not get handler')
-            _logger.debug('Could not get handler for mount {0}'.format(mount))
+            _logger.debug('Could not get handler for function {0} on mount {1} (type {2})'.format(func, mount, mtype))
             raise RuntimeError('Could not get handler')
         return(handler)
 
     def _getMount(self):
         mounts_xml = self.cfg.xml.find('.//mounts')
         self.mount = mounts.MountHandler(self.client, mounts_xml = mounts_xml)
-        if self.mname:
-            # Check that the mount exists
-            self.mount.getMountType(self.mname)
         return(None)
 
     def _getURI(self):
@@ -111,13 +112,20 @@ class VaultPass(object):
         _logger.debug('Set URI to {0}'.format(self.uri))
         return(None)
 
-    def _pathExists(self, path, mount = None, *args, **kwargs):
-        if not mount:
-            mount = self.mname
-        exists = False
-        if self.mount.getPath(path, mount):
-            exists = True
-        return(exists)
+    def _pathExists(self, path, mount, is_secret = False, *args, **kwargs):
+        kname = None
+        if is_secret:
+            lpath = path.split('/')
+            path = '/'.join(lpath[0:-1])
+            kname = lpath[-1]
+        path_obj = self.mount.getPath(path, mount)
+        if path_obj:
+            if not is_secret:
+                return(True)
+            else:
+                if kname in path_obj.keys():
+                    return(True)
+        return(False)
 
     def convert(self,
                 mount,
@@ -127,16 +135,29 @@ class VaultPass(object):
                 *args, **kwargs):
         pass  # TODO
 
-    def copySecret(self, oldpath, newpath, mount, newmount, force = False, remove_old = False, *args, **kwargs):
+    def copySecret(self, oldpath, newpath, mount, newmount = None, force = False, remove_old = False, *args, **kwargs):
         mtype = self.mount.getMountType(mount)
+        if not newmount:
+            newmount = mount
+            newmtype = mtype
+        else:
+            newmtype = self.mount.getMountType(newmount)
         oldexists = self._pathExists(oldpath, mount = mount)
         if not oldexists:
             _logger.error('oldpath does not exist')
             _logger.debug('The oldpath {0} does not exist'.format(oldpath))
             raise ValueError('oldpath does not exist')
         data = self.getSecret(oldpath, mount)
+        if not data:
+            _logger.error('No secret found')
+            _logger.debug('The secret at path {0} on mount {1} does not exist.'.format(oldpath, mount))
         # TODO: left off here
-        newexists = self._pathExists(newpath, mount = mount)
+        newexists = self._pathExists(newpath, mount = newmount)
+        if newexists and not force:
+            _logger.debug('The newpath {0} exists; prompting for confirmation.'.format(newpath))
+            confirm = self._getConfirm('The destination {0} exists. Overwrite (y/N)?'.format(newpath))
+            if not confirm:
+                return(None)
 
         if remove_old:
             self.deleteSecret(oldpath, mount, force = force)
@@ -161,7 +182,16 @@ class VaultPass(object):
         resp = handler(**args)
         return(resp)
 
-    def deleteSecret(self, path, mount_name, force = False, recursive = False, *args, **kwargs):
+    def deleteSecret(self, path, mount, force = False, recursive = False, *args, **kwargs):
+        mtype = self.mount.getMountType(mount)
+        args = {'path': path,
+                'mount_point': mount}
+        handler = self._getHandler(mount, func = 'delete')
+        is_path = self._pathExists(path, mount)
+        is_secret = self._pathExists(path, mount, is_secret = True)
+
+
+    def destroySecret(self, path, mount, force = False, recursive = False, *args, **kwargs):
         pass  # TODO
 
     def editSecret(self, path, mount, editor = constants.EDITOR, *args, **kwargs):
@@ -208,7 +238,7 @@ class VaultPass(object):
             _logger.error('Invalid auth configuration')
             raise RuntimeError('Invalid auth configuration')
         self.client = self.auth.client
-        if not self.client.sys.is_initialized():
+        if not self.client.sys.is_initialized() and not self.initialize:
             _logger.debug('Vault instance is not initialized. Please initialize (and configure, if necessary) first.')
             _logger.error('Not initialized')
             raise RuntimeError('Not initialized')
@@ -245,6 +275,7 @@ class VaultPass(object):
                     'qr': qr,
                     'seconds': seconds,
                     'printme': printme}
+            # Add return here?
             data = self.getSecret(**args)
         if qr not in (False, None):
             qrdata, has_x = QR.genQr(data, image = True)
@@ -255,9 +286,14 @@ class VaultPass(object):
                     fh.write(qrdata.read())
                 if printme:
                     _logger.debug('Opening {0} in the default image viwer application'.format(fpath))
-                    # We intentionally want this to block, as most image viewers will
-                    # unload the image once the file is deleted and we can probably
-                    # elete it before the user can save it elsewhere or scan it with their phone.
+                    # We intentionally want this to block, as most image viewers will  unload the image once the file
+                    # is deleted and we can probably delete it faster than the user can save it elsewhere or
+                    # scan it with their phone.
+                    # TODO: we could use Popen() and do a countdown for "seconds" seconds, and then kill the viewer.
+                    #       But that breaks compat with Pass' behaviour.
+                    if printme:
+                        print('Now displaying generated QR code. Please close the viewer when done saving/scanning to '
+                              'securely clean up the generated file...')
                     cmd = subprocess.run(['xdg-open', fpath], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
                     if cmd.returncode != 0:
                         _logger.error('xdg-open returned non-zero status code')
@@ -268,16 +304,35 @@ class VaultPass(object):
                             o = o.decode('utf-8').strip()
                             if o != '':
                                 _logger.debug('{0}: {1}'.format(x.upper(), o))
+                    if printme:
+                        print('Done. Deleting generated file.')
                     os.remove(fpath)
             elif printme:
                 print(qrdata.read())
             qrdata.seek(0, 0)
+            del(qrdata)
         if clip not in (False, None):
             clipboard.pasteClipboard(data, seconds = seconds, clipboard = clipboard, printme = printme)
         return(data)
 
     def initVault(self, *args, **kwargs):
-        pass  # TODO
+        if not self.client.sys.is_initialized():
+            init_rslt = self.client.sys.initialize(secret_shares = 1, secret_threshold = 1)
+            unseal = init_rslt['keys_base64'][0]
+            token = init_rslt['root_token']
+            self.cfg.updateAuth(unseal, token)
+            self.client.sys.submit_unseal_key(unseal)
+            self.client.token = token
+            # JUST in case.
+            time.sleep(1)
+            for mname, mtype in self.mount.mounts.items():
+                if mtype == 'cubbyhole':
+                    # There isn't a way to "create" a cubbyhole.
+                    continue
+                self.mount.createMount(mname, mtype)
+        self._checkSeal()
+        self._getMount()
+        return(None)
 
     def insertSecret(self,
                      path,

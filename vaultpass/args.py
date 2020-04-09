@@ -67,6 +67,9 @@ def parseArgs():
                               description = ('Delete a secret'),
                               help = ('Delete a secret'),
                               aliases = ['remove', 'delete'])
+    destroy = subparser.add_parser('destroy',
+                                   description = ('Destroy a secret permanently'),
+                                   help = ('Destroy a secret permanently'))
     show = subparser.add_parser('show',
                                 description = ('Print/fetch a secret'),
                                 help = ('Print/fetch a secret'))
@@ -399,7 +402,7 @@ def parseArgs():
     rm.add_argument('-r', '--recursive',
                     dest = 'recurse',
                     action = 'store_true',
-                    help = ('If PATH/TO/SECRET is a directory, delete all subentries'))
+                    help = ('If PATH/TO/SECRET is a directory, delete all subentries along with the path itself'))
     rm.add_argument('-f', '--force',
                     dest = 'force',
                     action = 'store_true',
@@ -407,6 +410,18 @@ def parseArgs():
     rm.add_argument('path',
                     metavar = 'PATH/TO/SECRET',
                     help = ('The path to the secret or subdirectory'))
+    # DESTROY
+    destroy.add_argument('-r', '--recursive',
+                         dest = 'recurse',
+                         action = 'store_true',
+                         help = ('If PATH/TO/SECRET is a directory, delete all subentries along with the path itself'))
+    destroy.add_argument('-f', '--force',
+                         dest = 'force',
+                         action = 'store_true',
+                         help = ('If specified, delete all matching path(s) without prompting for confirmation'))
+    destroy.add_argument('path',
+                         metavar = 'PATH/TO/SECRET',
+                         help = ('The path to the secret or subdirectory'))
     # SHOW
     # vp.getSecret(printme = True)
     # TODO: does the default overwrite the None if not specified?

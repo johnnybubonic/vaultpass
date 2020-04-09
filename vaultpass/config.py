@@ -1,7 +1,9 @@
 import copy
+import datetime
 import os
 import logging
 import re
+import shutil
 ##
 from . import gpg_handler
 import requests
@@ -216,6 +218,40 @@ class Config(object):
                                 inclusive_ns_prefixes = True)
         _logger.debug('Rendered string output successfully.')
         return(strxml)
+
+    def updateAuth(self, unseal_shard, token):
+        nsmap = self.namespaced_xml.nsmap
+        unseal_ns_xml = self.namespaced_xml.find('.//{{{0}}}unseal'.format(nsmap[None]))
+        unseal_xml = self.xml.find('.//unseal')
+        auth_ns_xml = self.namespaced_xml.find('.//{{{0}}}auth'.format(nsmap[None]))
+        auth_xml = self.xml.find('.//auth')
+        token_ns_xml = auth_ns_xml.find('.//{{{0}}}token'.format(nsmap[None]))
+        token_xml = auth_xml.find('.//token')
+        if token_xml is None:
+            # Config is using a non-token auth, so we replace it.
+            newauth_xml = etree.Element('auth')
+            newauth_ns_xml = etree.Element('auth', nsmap = nsmap)
+            token_xml = etree.SubElement(newauth_xml, 'token')
+            token_ns_xml = etree.SubElement(newauth_ns_xml, 'token', nsmap = nsmap)
+            auth_xml.getparent().replace(auth_xml, newauth_xml)
+            auth_ns_xml.getparent().replace(auth_ns_xml, newauth_ns_xml)
+        if unseal_xml is None:
+            # And we need to add the unseal as well.
+            server_xml = self.xml.find('.//server')
+            server_ns_xml = self.namespaced_xml.find('.//{{{0}}}server'.format(nsmap[None]))
+            unseal_xml = etree.SubElement(server_xml, 'unseal')
+            unseal_ns_xml = etree.SubElement(server_ns_xml, 'unseal')
+        unseal_xml.text = unseal_shard
+        unseal_ns_xml.text = unseal_shard
+        token_xml.text = token
+        token_ns_xml.text = token
+        self.parse()
+        if isinstance(self, LocalFile):
+            bakpath = '{0}.bak_{1}'.format(self.source, datetime.datetime.utcnow().timestamp())
+            shutil.copy(self.source, bakpath)
+            with open(self.source, 'wb') as fh:
+                fh.write(self.toString())
+        return(None)
 
     def validate(self):
         if not self.xsd:
