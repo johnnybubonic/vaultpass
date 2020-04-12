@@ -139,9 +139,6 @@ class VaultPass(object):
         mtype = self.mount.getMountType(mount)
         if not newmount:
             newmount = mount
-            newmtype = mtype
-        else:
-            newmtype = self.mount.getMountType(newmount)
         oldexists = self._pathExists(oldpath, mount = mount)
         if not oldexists:
             _logger.error('oldpath does not exist')
@@ -154,11 +151,19 @@ class VaultPass(object):
         # TODO: left off here
         newexists = self._pathExists(newpath, mount = newmount)
         if newexists and not force:
-            _logger.debug('The newpath {0} exists; prompting for confirmation.'.format(newpath))
+            _logger.debug('The newpath {0}:{1} exists; prompting for confirmation.'.format(newmount, newpath))
             confirm = self._getConfirm('The destination {0} exists. Overwrite (y/N)?'.format(newpath))
             if not confirm:
+                _logger.debug('Confirmation denied; skipping copy of {0}:{1} to {2}:{3}.'.format(mount,
+                                                                                                 oldpath,
+                                                                                                 newmount,
+                                                                                                 newpath))
+                print('Not overwriting.')
                 return(None)
-
+            _logger.debug('Confirmed overwriting copy of {0}:{1} to {1}:{2}.'.format(mount, oldpath, newmount, newpath))
+        if newexists:
+            self.deleteSecret(newpath, newmount, force = True)
+        self.createSecret(data, newpath, newmount)
         if remove_old:
             self.deleteSecret(oldpath, mount, force = force)
         return(None)
@@ -182,17 +187,39 @@ class VaultPass(object):
         resp = handler(**args)
         return(resp)
 
-    def deleteSecret(self, path, mount, force = False, recursive = False, *args, **kwargs):
+    def deleteSecret(self, path, mount, force = False, recursive = False, destroy = False, *args, **kwargs):
         mtype = self.mount.getMountType(mount)
         args = {'path': path,
                 'mount_point': mount}
-        handler = self._getHandler(mount, func = 'delete')
+        if destroy:
+            op = 'destroy'
+        else:
+            op = 'delete'
+        handler = self._getHandler(mount, func = op)
         is_path = self._pathExists(path, mount)
         is_secret = self._pathExists(path, mount, is_secret = True)
-
-
-    def destroySecret(self, path, mount, force = False, recursive = False, *args, **kwargs):
-        pass  # TODO
+        if is_path and not recursive and not force:
+            _logger.debug('Path {0} is a subdir and not a specific key; prompting for confirmation'.format(path))
+            confirm = self._getConfirm('{0}:{1} is a path, not a secret. {2} recursively? (y/N) '.format(mount,
+                                                                                                         path,
+                                                                                                         op.title()))
+            if not confirm:
+                _logger.debug('Confirmation denied; skipping recursive {0} of {1}:{2}.'.format(op, mount, path))
+                print('Not deleting.')
+                return(None)
+            _logger.debug('Confirmed {0} of {1}:{2}.'.format(op, mount, path))
+        elif is_path and not force:
+            confirm = self._getConfirm('Really {0} path {1}:{2} recursively? (y/N) '.format(op, mount, path))
+            if not confirm:
+                _logger.debug('Confirmation denied; skipping recursive {0} of {1}:{2}.'.format(op, mount, path))
+                return(None)
+            _logger.debug('Confirmed {0} of {1}:{2}.'.format(op, mount, path))
+        elif is_secret:
+            lpath = path.split('/')
+            kname = lpath[-1]
+            path = '/'.join(lpath[0:-1])
+            self.removeSecretName(kname, path, mount, force = force, destroy = destroy)
+        return(handler(**args))
 
     def editSecret(self, path, mount, editor = constants.EDITOR, *args, **kwargs):
         pass  # TODO
@@ -345,6 +372,10 @@ class VaultPass(object):
         pass  # TODO
 
     def listSecretNames(self, path, mount, output = None, indent = 4, *args, **kwargs):
+        pass  # TODO
+
+    def removeSecretName(self, kname, path, mount, force = False, destroy = False, *args, **kwargs):
+        # NOTE: this should edit a secret such that it removes a key from the dict at path.
         pass  # TODO
 
     def searchSecrets(self, pattern, mount, *args, **kwargs):
