@@ -17,6 +17,7 @@ from . import constants
 from . import gpg_handler
 from . import mounts
 from . import pass_import
+from . import pwgen
 from . import QR
 
 
@@ -63,9 +64,10 @@ class VaultPass(object):
         return(False)
 
     def _getHandler(self, mount, func = 'read', *args, **kwargs):
-        if func not in ('read', 'write', 'list', 'delete', 'destroy'):
+        funcs = ('read', 'write', 'list', 'delete', 'destroy')
+        if func not in funcs:
             _logger.error('Invalid func')
-            _logger.debug('Invalid func; must be one of: read, write, list, delete, destroy')
+            _logger.debug('Invalid func; must be one of: {0}'.format(', '.join(funcs)))
             raise ValueError('Invalid func')
         mtype = self.mount.getMountType(mount)
         handler = None
@@ -168,22 +170,29 @@ class VaultPass(object):
             self.deleteSecret(oldpath, mount, force = force)
         return(None)
 
-    def createSecret(self, secret_dict, path, mount_name, *args, **kwargs):
-        mtype = self.mount.mounts.get(mount_name)
-        handler = None
+    def createSecret(self, secret_dict, path, mount, force = False, *args, **kwargs):
+        mtype = self.mount.mounts.get(mount)
         if not mtype:
             _logger.error('Could not determine mount type')
-            _logger.debug('Could not determine mount type for mount {0}'.format(mount_name))
+            _logger.debug('Could not determine mount type for mount {0}'.format(mount))
             raise RuntimeError('Could not determine mount type')
         args = {'path': path,
-                'mount_point': mount_name,
+                'mount_point': mount,
                 'secret': secret_dict}
-        if mtype == 'cubbyhole':
-            handler = self.mount.cubbyhandler.write_secret
-        elif mtype == 'kv1':
-            handler = self.client.secrets.kv.v1.create_or_update_secret
-        elif mtype == 'kv2':
-            handler = self.client.secrets.kv.v2.create_or_update_secret
+        path_exists = self._pathExists(path, mount)
+        if path_exists:
+            for k in secret_dict.keys():
+                kpath = '/'.join(path, k)
+                exists = self._pathExists(kpath, mount, is_secret = True)
+                if exists:
+                    _logger.warning('A secret named {0} at {1}:{2} exists.'.format(k, mount, path))
+                    if not force:
+                        _logger.error('Cannot create secret; a name already exists.')
+                        raise ValueError('Cannot create secret; a name already exists.')
+        if path_exists:
+            handler = self._getHandler(mount, func = 'update')
+        else:
+            handler = self._getHandler(mount, func = 'write')
         resp = handler(**args)
         return(resp)
 
@@ -227,6 +236,7 @@ class VaultPass(object):
     def generateSecret(self,
                        path,
                        mount,
+                       kname = None,
                        symbols = True,
                        clip = False,
                        seconds = constants.CLIP_TIMEOUT,
@@ -236,8 +246,27 @@ class VaultPass(object):
                        qr = False,
                        force = False,
                        length = constants.GENERATED_LENGTH,
+                       printme = False,
                        *args, **kwargs):
-        pass  # TODO
+        charset = {'simple': chars_plain,
+                   'complex': chars}
+        pg_args = {'length': length,
+                   'chars': charset,
+                   'charset': ('complex' if symbols else 'simple')}
+        pg = pwgen.genPass(**pg_args)
+        pg.genPW()
+        passwd = pg.pw
+        if not kname:
+            lpath = path.split('/')
+            kname = lpath[-1]
+            path = '/'.join(lpath[0:-1])
+        args = {'secret_dict': {kname: passwd},
+                'path': path,
+                'mount': mount,
+                'force': force}
+        self.createSecret(**args)
+        self.getSecret(path, mount, kname = kname, clip = clip, qr = qr, seconds = seconds, printme = printme)
+        return(passwd)
 
     def getClient(self):
         auth_xml = self.cfg.xml.find('.//auth')
@@ -320,7 +349,7 @@ class VaultPass(object):
                     #       But that breaks compat with Pass' behaviour.
                     if printme:
                         print('Now displaying generated QR code. Please close the viewer when done saving/scanning to '
-                              'securely clean up the generated file...')
+                              'securely clean up the generated file and continue...')
                     cmd = subprocess.run(['xdg-open', fpath], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
                     if cmd.returncode != 0:
                         _logger.error('xdg-open returned non-zero status code')
@@ -339,7 +368,7 @@ class VaultPass(object):
             qrdata.seek(0, 0)
             del(qrdata)
         if clip not in (False, None):
-            clipboard.pasteClipboard(data, seconds = seconds, clipboard = clipboard, printme = printme)
+            clipboard.pasteClipboard(data, seconds = seconds, printme = printme)
         return(data)
 
     def initVault(self, *args, **kwargs):

@@ -114,7 +114,7 @@ def parseArgs():
                       metavar = 'NAME_PATTERN',
                       help = ('List secrets\' paths whose names match the regex NAME_PATTERN'))
     # GENERATE
-    # vp.generateSecret()
+    # vp.generateSecret(printme = True)
     # TODO: feature parity with passgen (spaces? etc.)
     gen.add_argument('-n', '--no-symbols',
                      dest = 'symbols',

@@ -30,28 +30,38 @@ class CubbyHandler(object):
         # Alias function
         return(self.write_secret(*args, **kwargs))
 
-    def list_secrets(self, path, mount_point = 'cubbyhole'):
+    def list_secrets(self, path, mount_point = 'cubbyhole', *args, **kwargs):
         path = path.lstrip('/')
-        uri = '/v1/{0}/{1}'.format(mount_point, path)
+        uri = 'v1/{0}/{1}'.format(mount_point, path)
         resp = self.client._adapter.list(url = uri)
         return(resp.json())
 
-    def read_secret(self, path, mount_point = 'cubbyhole'):
+    def read_secret(self, path, mount_point = 'cubbyhole', *args, **kwargs):
         path = path.lstrip('/')
-        # uri = '/v1/{0}/{1}'.format(mount_point, path)
-        uri = '{0}/{1}'.format(mount_point, path)
+        uri = 'v1/{0}/{1}'.format(mount_point, path)
         resp = self.client._adapter.get(url = uri)
         return(resp.json())
 
     def remove_secret(self, path, mount_point = 'cubbyhole', *args, **kwargs):
         path = path.lstrip('/')
-        uri = '{0}/{1}'.format(mount_point, path)
+        uri = 'v1/{0}/{1}'.format(mount_point, path)
         resp = self.client._adapter.delete(url = uri)
         return(resp.json())
 
+    def update_secret(self, secret, path, mount_point = 'cubbyhole', *args, **kwargs):
+        existing = self.read_secret(path, mount_point)
+        data = existing.get('data')
+        if not data:
+            resp = self.write_secret(path, secret, mount_point = mount_point)
+        else:
+            data.update(secret)
+            self.remove_secret(path, mount_point)
+            resp = self.write_secret(path, data, mount_point)
+        return(resp)
+
     def write_secret(self, path, secret, mount_point = 'cubbyhole', *args, **kwargs):
         path = path.lstrip('/')
-        args = {'path': '/'.join((mount_point, path))}
+        args = {'path': 'v1/{0}'.format('/'.join((mount_point, path)))}
         for k, v in secret.items():
             if k in args.keys():
                 _logger.error('Cannot use reserved secret name')
