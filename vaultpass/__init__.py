@@ -14,6 +14,7 @@ from . import auth
 from . import clipboard
 from . import config
 from . import constants
+from . import editor
 from . import gpg_handler
 from . import mounts
 from . import pass_import
@@ -150,7 +151,6 @@ class VaultPass(object):
         if not data:
             _logger.error('No secret found')
             _logger.debug('The secret at path {0} on mount {1} does not exist.'.format(oldpath, mount))
-        # TODO: left off here
         newexists = self._pathExists(newpath, mount = newmount)
         if newexists and not force:
             _logger.debug('The newpath {0}:{1} exists; prompting for confirmation.'.format(newmount, newpath))
@@ -230,8 +230,13 @@ class VaultPass(object):
             self.removeSecretName(kname, path, mount, force = force, destroy = destroy)
         return(handler(**args))
 
-    def editSecret(self, path, mount, editor = constants.EDITOR, *args, **kwargs):
-        pass  # TODO
+    def editSecret(self, path, mount, editor_prog = constants.EDITOR, *args, **kwargs):
+        data = self.getSecret(path, mount)
+        newdata, fpath = editor.Editor(data, editor = editor_prog)
+        print('Done. Deleting generated file.')
+        os.remove(fpath)
+        self.createSecret(newdata, path, mount, force = True)
+        return(newdata)
 
     def generateSecret(self,
                        path,

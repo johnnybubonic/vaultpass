@@ -1,7 +1,6 @@
 import io
 import json
 import os
-import subprocess
 import logging
 _logger = logging.getLogger()
 ##
