@@ -1,7 +1,9 @@
+import getpass
 import logging
 import tempfile
 import os
 import subprocess
+import sys
 import time
 ##
 from . import logger
@@ -76,17 +78,20 @@ class VaultPass(object):
                                      'write': self.mount.cubbyhandler.write_secret,
                                      'list': self.mount.cubbyhandler.list_secrets,
                                      'delete': self.mount.cubbyhandler.remove_secret,
-                                     'destroy': self.mount.cubbyhandler.remove_secret},
+                                     'destroy': self.mount.cubbyhandler.remove_secret,
+                                     'update': self.mount.cubbyhandler.update_secret},
                        'kv1': {'read': self.client.secrets.kv.v1.read_secret,
                                'write': self.client.secrets.kv.v1.create_or_update_secret,
                                'list': self.client.secrets.kv.v1.list_secrets,
                                'delete': self.client.secrets.kv.v1.delete_secret,
-                               'destroy': self.client.secrets.kv.v1.delete_secret},
+                               'destroy': self.client.secrets.kv.v1.delete_secret,
+                               'update': self.client.secrets.kv.v1.create_or_update_secret},
                        'kv2': {'read': self.client.secrets.kv.v2.read_secret_version,
                                'write': self.client.secrets.kv.v2.create_or_update_secret,
                                'list': self.client.secrets.kv.v2.list_secrets,
                                'delete': self.client.secrets.kv.v2.delete_secret_versions,
-                               'destroy': self.client.secrets.kv.v2.destroy_secret_versions}}
+                               'destroy': self.client.secrets.kv.v2.destroy_secret_versions,
+                               'update': self.client.secrets.kv.v2.create_or_update_secret}}
         handler = handler_map.get(mtype, {}).get(func, None)
         if not handler:
             _logger.error('Could not get handler')
@@ -403,7 +408,60 @@ class VaultPass(object):
                      force = False,
                      confirm = True,
                      *args, **kwargs):
-        pass  # TODO
+        # This is a function that's mostly sugar for the CLI part.
+        # If you're using VaultPass as a python library, you'll probably just want to skip directly to
+        # self.createSecret().
+        orig_path = path
+        lpath = path.split('/')
+        kname = lpath[-1]
+        path = '/'.join(lpath[0:-1])
+        is_tty = sys.stdin.isatty()
+        if not is_tty:  # It's a pipe (or cron or something, but that'd be dumb for this).
+            secret = ''
+            end = ['']
+            if not multiline:
+                end.append('\n')
+            while True:
+                c = sys.stdin.read(1)
+                if c in end:
+                    break
+                secret += c
+        else:  # It's an interactive shell.
+            if allow_shouldersurf:
+                msg = 'Secret/password:'
+            else:
+                msg = 'Secret/password (will NOT echo back):'
+            if multiline:
+                print('{0} (ctrl-D when done)\n'.format(msg))
+                if allow_shouldersurf:
+                    secret = sys.stdin.readlines()
+                else:
+                    # This gets a *little* hacky.
+                    # Inspiration from https://stackoverflow.com/a/10426831/733214
+                    secret = []
+                    try:
+                        while True:
+                            try:
+                                i = getpass.getpass('')
+                                secret.append(i)
+                            except EOFError:
+                                break
+                    except KeyboardInterrupt:
+                        pass
+                secret = '\n'.join(secret)
+        if confirm:
+            _logger.debug('Getting confirmation to write to {0} ({1}) on mount {2}'.format(path, kname, mount))
+            confirmation = self._getConfirm('Write to {0}:{1} ({2})? (y/N) '.format(mount, path, kname))
+            if not confirmation:
+                _logger.debug('Confirmation denied; skipping.')
+                return(None)
+        exists = self._pathExists(orig_path, mount, is_secret = True)
+        data = {}
+        if exists:
+            data = self.getSecret(path, mount, kname = kname)
+        data[kname] = secret
+        self.createSecret(data, path, mount, force = force)
+        return(None)
 
     def listSecretNames(self, path, mount, output = None, indent = 4, *args, **kwargs):
         pass  # TODO
