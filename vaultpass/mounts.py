@@ -133,21 +133,6 @@ class MountHandler(object):
         obj = dpath.util.get(self.paths, fullpath, None)
         return(obj)
 
-    def getSecret(self, path, mount, version = None):
-        if not self.mounts:
-            self.getSysMounts()
-        mtype = self.getMountType(mount)
-        args = {}
-        handler = None
-        if mtype == 'cubbyhole':
-            handler = self.cubbyhandler.read_secret
-        elif mtype == 'kv1':
-            handler = self.client.secrets.kv.v1.read_secret
-        if mtype == 'kv2':
-            args['version'] = version
-        data = self.client.secrets
-        # TODO
-
     def getSecretNames(self, path, mount, version = None):
         reader = None
         mtype = self.getMountType(mount)
@@ -267,7 +252,7 @@ class MountHandler(object):
                     _logger.debug('Added mountpoint {0} to mounts list with type {1}'.format(mount, mtype))
         return(None)
 
-    def printer(self, output = None, indent = 4):
+    def printer(self, path = '/', mounts = None, output = None, indent = 4):
         # def treePrint(obj, s = 'Password Store\n', level = 0):
         #     prefix = '├──'
         #     leading_prefix = '│'
@@ -276,12 +261,10 @@ class MountHandler(object):
         #     return(s)
         if output:
             output = output.lower()
-        if output and output not in ('pretty', 'yaml', 'json'):
-        # if output and output not in ('pretty', 'yaml', 'json', 'tree'):
+        if output and output not in constants.SUPPORTED_OUTPUT_FORMATS:
             _logger.error('Invalid output format')
-            _logger.debug('The output parameter ("{0}") must be one of: pretty, yaml, json, or None'.format(output))
-            # _logger.debug(('The output parameter ("{0}") must be one of: '
-            #                'pretty, yaml, json, tree, or None').format(output))
+            _logger.debug(('The output parameter ("{0}") must be one of: '
+                           '{0}, or None').format(output, ', '.join(constants.SUPPORTED_OUTPUT_FORMATS)))
             raise ValueError('Invalid output format')
         if output in ('pretty', 'yaml', 'json'):
             if not any(((indent is None), isinstance(indent, int))):
@@ -290,20 +273,25 @@ class MountHandler(object):
                 raise ValueError('indent parameter must be an integer or None')
         if not self.paths:
             self.getSecretsTree()
+        _paths = {}
+        if not mounts:
+            mounts = self.mounts.keys()
+        for m in mounts:
+            _paths[m] = self.getPath(path, m)
         if output == 'json':
             import json
-            return(json.dumps(self.paths, indent = indent))
+            return(json.dumps(_paths, indent = indent))
         elif output == 'yaml':
             import yaml  # https://pypi.org/project/PyYAML/
             # import pyaml  # https://pypi.python.org/pypi/pyaml
-            return(yaml.dump(self.paths, indent = indent))
+            return(yaml.dump(_paths, indent = indent))
         elif output == 'pretty':
             import pprint
             if indent is None:
                 indent = 1
-            return(pprint.pformat(self.paths, indent = indent, width = shutil.get_terminal_size((80, 20)).columns))
+            return(pprint.pformat(_paths, indent = indent, width = shutil.get_terminal_size((80, 20)).columns))
         # elif output == 'tree':
         #     import tree  # TODO? Wayyy later.
         elif not output:
-            return(str(self.paths))
+            return(str(_paths))
         return(None)

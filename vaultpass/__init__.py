@@ -232,7 +232,7 @@ class VaultPass(object):
             lpath = path.split('/')
             kname = lpath[-1]
             path = '/'.join(lpath[0:-1])
-            self.removeSecretName(kname, path, mount, force = force, destroy = destroy)
+            self.removeSecretName(kname, path, mount, destroy = destroy)
         return(handler(**args))
 
     def editSecret(self, path, mount, editor_prog = constants.EDITOR, *args, **kwargs):
@@ -458,17 +458,43 @@ class VaultPass(object):
         exists = self._pathExists(orig_path, mount, is_secret = True)
         data = {}
         if exists:
+            if not force:
+                _logger.debug('Getting confirmation to update/replace {0} ({1}) on mount {2}'.format(path,
+                                                                                                     kname,
+                                                                                                     mount))
+                confirmation = self._getConfirm(('Secret name {0} at path {1} on mount {2} exists. '
+                                                 'Overwrite/update? (y/N) ').format(kname, path, mount))
+                if not confirmation:
+                    _logger.debug('Confirmation denied; skipping.')
+                    return(None)
             data = self.getSecret(path, mount, kname = kname)
         data[kname] = secret
         self.createSecret(data, path, mount, force = force)
         return(None)
 
     def listSecretNames(self, path, mount, output = None, indent = 4, *args, **kwargs):
-        pass  # TODO
+        exists = self._pathExists(path, mount)
+        is_secret = self._pathExists(path, mount, is_secret = True)
+        if not any((exists, is_secret)):
+            _logger.error('Invalid path')
+            _logger.debug('Path {0} on mount {1} is invalid/does not exist.'.format(path, mount))
+            raise ValueError('Invalid path')
+        self.mount.getSecretsTree(path = path, mounts = mount)
+        outstr = self.mount.printer(path = path, mounts = mount, output = output, indent = indent)
+        print(outstr)
+        return(None)
 
-    def removeSecretName(self, kname, path, mount, force = False, destroy = False, *args, **kwargs):
+    def removeSecretName(self, kname, path, mount, destroy = False, *args, **kwargs):
         # NOTE: this should edit a secret such that it removes a key from the dict at path.
-        pass  # TODO
+        data = self.getSecret(path, mount)
+        if kname not in data:
+            _logger.error('Secret name does not exist')
+            _logger.debug('Secret name {0} does not exist in {1}:{2}.'.format(kname, mount, path))
+            raise ValueError('Secret name does not exist')
+        del(data[kname])
+        # TODO: handle destroy?
+        self.createSecret(data, path, mount, force = True)
+        return(data)
 
     def searchSecrets(self, pattern, mount, *args, **kwargs):
         pass  # TODO

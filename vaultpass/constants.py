@@ -5,6 +5,7 @@ import string
 NAME = 'VaultPass'
 VERSION = '0.0.1'
 SUPPORTED_ENGINES = ('kv1', 'kv2', 'cubbyhole')
+# SUPPORTED_OUTPUT_FORMATS = ('pretty', 'yaml', 'json', 'tree')
 SUPPORTED_OUTPUT_FORMATS = ('pretty', 'yaml', 'json')
 ALPHA_LOWER_PASS_CHARS = string.ascii_lowercase
 ALPHA_UPPER_PASS_CHARS = string.ascii_uppercase
