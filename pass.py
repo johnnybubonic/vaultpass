@@ -15,8 +15,9 @@ def main():
     if args.oper == 'version':
         print('{0} {1}'.format(vaultpass.constants.NAME,
                                vaultpass.constants.VERSION))
-    import pprint
-    pprint.pprint(vars(args))
+    args.initialize = (True if args.oper == 'init' else False)
+    args.verify_cfg = (True if args.oper == 'verify' else False)
+    vp = vaultpass.VaultPass(**vars(args))
     return(None)
 
 

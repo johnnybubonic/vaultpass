@@ -14,12 +14,25 @@ def parseArgs():
                       action = 'version',
                       version = '{0} {1}'.format(constants.NAME, constants.VERSION))
     args.add_argument('-c', '--config',
+                      dest = 'cfg',
                       default = '~/.config/vaultpass.xml',
                       help = ('The path to your configuration file. Default: ~/.config/vaultpass.xml'))
+    args.add_argument('-l', '--loglevel',
+                      dest = 'loglevel',
+                      default = constants.DEFAULT_LOGLEVEL,
+                      help = ('The log level. Default: {0}').format(constants.DEFAULT_LOGLEVEL_NAME))
+    # I can't get this to change in the logger root. TODO.
+    # args.add_argument('-L', '--logfile',
+    #                   dest = 'logfile',
+    #                   default = constants.DEFAULT_LOGFILE,
+    #                   help = ('The file to use for logging. '
+    #                           'Default: {0}').format(constants.DEFAULT_LOGFILE))
     args.add_argument('-m', '--mount',
                       dest = 'mount',
-                      default = 'secret',
-                      help = ('The mount to use in OPERATION. If not specified, assume a mount named "secret"'))
+                      default = constants.SELECTED_DEFAULT_MOUNT,
+                      help = (('The mount to use in OPERATION. '
+                               'If not specified, assume a mount named '
+                               '"{0}"').format(constants.SELECTED_DEFAULT_MOUNT)))
     # I wish argparse supported default subcommands. It doesn't as of python 3.8.
     subparser = args.add_subparsers(help = ('Operation to perform'),
                                     metavar = 'OPERATION',
@@ -79,6 +92,9 @@ def parseArgs():
     importvault = subparser.add_parser('import',
                                        description = ('Import your existing Pass into Vault'),
                                        help = ('Import your existing Pass into Vault'))
+    verify = subparser.add_parser('verify',
+                                  description = ('Verify the validity and syntax of your configuration file'),
+                                  help = ('Verify the validity and syntax of your configuration file'))
     # CP/COPY
     # vp.copySecret()
     cp.add_argument('-f', '--force',
@@ -460,10 +476,16 @@ def parseArgs():
     importvault.add_argument('-f', '--force',
                              dest = 'force',
                              action = 'store_true',
-                             help = ('If specified, overwrite the destination in Vault.'))
+                             help = ('If specified, overwrite the destination in Vault'))
+    importvault.add_argument('-F', '--flat',
+                             action = 'store_true',
+                             help = ('Being that this is already a very tenuous process, this allows a bit more '
+                                     'flexibility - passing -F/--flat indicates that the content itself rather than '
+                                     'the path is significant (see the README for more information)'))
     importvault.add_argument('mount',
                              metavar = 'MOUNT_NAME',
                              help = 'The mount name in Vault to import into (Pass\' hierarchy will be recreated). '
                                     'This mount MUST exist first and MUST be KV2 if auth is provided that does not '
                                     'have CREATE access on /sys/mounts!')
+    # VERIFY has no args.
     return(args)

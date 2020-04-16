@@ -2,6 +2,8 @@ import logging
 import logging.handlers
 import os
 ##
+from . import constants
+##
 try:
     # https://www.freedesktop.org/software/systemd/python-systemd/journal.html#journalhandler-class
     from systemd import journal
@@ -10,23 +12,20 @@ except ImportError:
     _has_journald = False
 
 
-logfile = os.path.abspath(os.path.expanduser('~/.cache/vaultpass/vaultpass.log'))
-
-
-def prepLogfile(path = logfile):
+def prepLogfile(path = constants.DEFAULT_LOGFILE):
     path = os.path.abspath(os.path.expanduser(path))
     # Set up the permissions beforehand.
-    os.makedirs(os.path.dirname(logfile), exist_ok = True, mode = 0o0700)
+    os.makedirs(os.path.dirname(path), exist_ok = True, mode = 0o0700)
     if not os.path.isfile(path):
         # "Touch" it so the next command doesn't fail.
         with open(path, 'w') as fh:
             fh.write('')
-    os.chmod(logfile, 0o0600)
+    os.chmod(path, 0o0600)
     return(path)
 
 
 _cfg_args = {'handlers': [],
-             'level': logging.DEBUG}  # TEMPORARY FOR TESTING
+             'level': constants.DEFAULT_LOGLEVEL}
 if _has_journald:
     # There were some weird changes somewhere along the line.
     try:

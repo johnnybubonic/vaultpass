@@ -345,5 +345,5 @@ def getConfig(cfg_ref, validate = True, populate_defaults = True, xsd_path = Non
                 break
     if cfgobj:
         _logger.info('Parsing configuration.')
-        cfgobj.main(validate = validate, populate_defaults = populate_defaults)
+        cfgobj.main(validate = validate, populate_defaults = (populate_defaults if validate else False))
     return(cfgobj)

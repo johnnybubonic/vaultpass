@@ -7,10 +7,10 @@ _logger = logging.getLogger()
 try:
     import qrcode
     has_qrcode = True
-    _logger.warning(('Could not import qrcode; '
-                     'library required for QR code generation'))
 except ImportError:
     has_qrcode = False
+    _logger.warning(('Could not import qrcode; '
+                     'library required for QR code generation'))
 try:
     import qrcode.image.svg
     has_qrcode_svg = True

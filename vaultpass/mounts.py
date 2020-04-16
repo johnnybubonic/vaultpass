@@ -81,6 +81,7 @@ class MountHandler(object):
         self.xml = mounts_xml
         self.mounts = {}
         self.paths = {}
+        self.flatpaths = set()
         self.getSysMounts()
 
     def createMount(self, mount_name, mount_type = 'kv2'):
@@ -184,6 +185,9 @@ class MountHandler(object):
                     _logger.debug('The version parameter ({0}) must be an integer or None'.format(version))
                     raise ValueError('version parameter must be an integer or None')
                 handler = self.client.secrets.kv.v2
+            self.flatpaths.add(mount)
+            flatpath = path.rstrip('/')
+            self.flatpaths.add('/'.join((mount, flatpath)))
             if mount not in self.paths.keys():
                 self.paths[mount] = {}
             try:

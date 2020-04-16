@@ -1,4 +1,5 @@
 import os
+import logging
 import string
 
 # These are static.
@@ -7,6 +8,10 @@ VERSION = '0.0.1'
 SUPPORTED_ENGINES = ('kv1', 'kv2', 'cubbyhole')
 # SUPPORTED_OUTPUT_FORMATS = ('pretty', 'yaml', 'json', 'tree')
 SUPPORTED_OUTPUT_FORMATS = ('pretty', 'yaml', 'json')
+DEFAULT_LOGFILE = os.path.abspath(os.path.expanduser('~/.cache/vaultpass/vaultpass.log'))
+DEFAULT_LOGLEVEL_NAME = 'WARNING'
+DEFAULT_LOGLEVEL = getattr(logging, DEFAULT_LOGLEVEL_NAME)
+DEFAULT_MOUNT = 'secret'
 ALPHA_LOWER_PASS_CHARS = string.ascii_lowercase
 ALPHA_UPPER_PASS_CHARS = string.ascii_uppercase
 ALPHA_PASS_CHARS = ALPHA_LOWER_PASS_CHARS + ALPHA_UPPER_PASS_CHARS
@@ -39,6 +44,7 @@ if not os.environ.get('NO_VAULTPASS_ENVS'):
     EDITOR = os.environ.get('EDITOR', EDITOR)
     SELECTED_GPG_HOMEDIR = os.environ.get('GNUPGHOME', GPG_HOMEDIR)
     PASS_DIR = os.environ.get('PASSWORD_STORE_DIR', PASS_DIR)
+    SELECTED_DEFAULT_MOUNT = os.environ.get('VAULTPASS_DEFMNT', DEFAULT_MOUNT)
 
 # These are made more sane.
 PASS_DIR = os.path.abspath(os.path.expanduser(PASS_DIR))

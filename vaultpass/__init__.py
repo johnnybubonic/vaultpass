@@ -2,6 +2,8 @@ import getpass
 import logging
 import tempfile
 import os
+import pathlib
+import re
 import subprocess
 import sys
 import time
@@ -19,7 +21,6 @@ from . import constants
 from . import editor
 from . import gpg_handler
 from . import mounts
-from . import pass_import
 from . import pwgen
 from . import QR
 
@@ -30,9 +31,22 @@ class VaultPass(object):
     uri = None
     mount = None
 
-    def __init__(self, initialize = False, cfg = '~/.config/vaultpass.xml'):
+    def __init__(self,
+                 initialize = False,
+                 cfg = '~/.config/vaultpass.xml',
+                 verify_cfg = True,
+                 loglevel = constants.DEFAULT_LOGLEVEL,
+                 *args,
+                 **kwargs):
+        rootlogger = logging.getLogger()
+        if loglevel != constants.DEFAULT_LOGLEVEL:
+            if not isinstance(loglevel, int):
+                # We need to convert it from the name to the int.
+                loglevel = getattr(logging, loglevel.upper())
+        if loglevel != constants.DEFAULT_LOGLEVEL:  # And again in case we transformed it above.
+            rootlogger.setLevel(loglevel)
         self.initialize = initialize
-        self.cfg = config.getConfig(cfg)
+        self.cfg = config.getConfig(cfg, validate = verify_cfg)
         self._getURI()
         self.getClient()
         if not self.initialize:
@@ -140,8 +154,39 @@ class VaultPass(object):
                 force = False,
                 gpghome = constants.GPG_HOMEDIR,
                 pass_dir = constants.PASS_DIR,
+                flat = False,
                 *args, **kwargs):
-        pass  # TODO
+        pass_dir = os.path.abspath(os.path.expanduser(pass_dir))
+        gpg = gpg_handler.GPG(home = gpghome)
+        kname_re = re.compile(r'^(?P<kname>[^/]+)\.(gpg|asc)$')
+        for root, dirs, files in os.walk(pass_dir):
+            rel_root = pathlib.Path(root).relative_to(pass_dir)
+            for f in files:
+                r = kname_re.search(f)
+                if not r:
+                    continue
+                kname = r.groupdict()['kname']
+                dcryptdata = gpg.decrypt(os.path.join(root, f)).decode('utf-8')
+                if flat:
+                    path = os.path.dirname(rel_root)
+                    data = {kname: dcryptdata}
+                    self.createSecret(data, path, mount, force = force)
+                else:
+                    data = {}
+                    k = None
+                    v = ''
+                    for line in dcryptdata.splitlines():
+                        l = [i.strip() for i in line.split(':', 1) if i.strip() != '']
+                        if len(l) == 1:
+                            v += '\n{0}'.format(l[0])
+                        elif len(l) == 0:
+                            continue
+                        else:
+                            data[k] = v
+                            k = l[0]
+                            v = l[1]
+                    self.createSecret(data, path = '/'.join((rel_root, kname)), mount = mount, force = force)
+        return(None)
 
     def copySecret(self, oldpath, newpath, mount, newmount = None, force = False, remove_old = False, *args, **kwargs):
         mtype = self.mount.getMountType(mount)
@@ -497,7 +542,22 @@ class VaultPass(object):
         return(data)
 
     def searchSecrets(self, pattern, mount, *args, **kwargs):
-        pass  # TODO
+        print('This may take a while...')
+        ptrn = re.compile(pattern)
+        self.mount.getSecretsTree(mounts = mount)
+        for p in self.mount.flatpaths:
+            data = self.getSecret(p, mount)
+            if data:
+                for k, v in data.items():
+                    if ptrn.search(v):
+                        print('/'.join((mount, p, k)))
+        return(None)
 
     def searchSecretNames(self, pattern, mount, *args, **kwargs):
-        pass  # TODO
+        ptrn = re.compile(pattern)
+        self.mount.getSecretsTree(mounts = mount)
+        for p in self.mount.flatpaths:
+            n = p.split('/')[-1]
+            if ptrn.search(n):
+                print(p)
+        return(None)
