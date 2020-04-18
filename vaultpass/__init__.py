@@ -103,8 +103,8 @@ class VaultPass(object):
                        'kv2': {'read': self.client.secrets.kv.v2.read_secret_version,
                                'write': self.client.secrets.kv.v2.create_or_update_secret,
                                'list': self.client.secrets.kv.v2.list_secrets,
-                               'delete': self.client.secrets.kv.v2.delete_secret_versions,
-                               'destroy': self.client.secrets.kv.v2.destroy_secret_versions,
+                               'delete': self.client.secrets.kv.v2.delete_latest_version_of_secret,
+                               'destroy': self.client.secrets.kv.v2.delete_metadata_and_all_versions,
                                'update': self.client.secrets.kv.v2.create_or_update_secret}}
         handler = handler_map.get(mtype, {}).get(func, None)
         if not handler:
@@ -278,6 +278,10 @@ class VaultPass(object):
             kname = lpath[-1]
             path = '/'.join(lpath[0:-1])
             self.removeSecretName(kname, path, mount, destroy = destroy)
+        # The business end.
+        if op == 'destroy':
+            if mtype == 'kv2':
+                versions = self.client.secrets.kv.v2.
         return(handler(**args))
 
     def editSecret(self, path, mount, editor_prog = constants.EDITOR, *args, **kwargs):
