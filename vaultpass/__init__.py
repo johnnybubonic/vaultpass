@@ -278,7 +278,7 @@ class VaultPass(object):
             kname = lpath[-1]
             path = '/'.join(lpath[0:-1])
             self.removeSecretName(kname, path, mount, destroy = destroy)
-        # The business end.
+        # We need to recurse down and delete secrets. Empty subdirs are removed automatically.
         if op == 'destroy':
             if mtype == 'kv2':
                 versions = self.client.secrets.kv.v2.
