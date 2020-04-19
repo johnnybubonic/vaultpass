@@ -136,6 +136,7 @@ class VaultPass(object):
 
     def _pathExists(self, path, mount, is_secret = False, *args, **kwargs):
         kname = None
+        path = path.rstrip('/')
         if is_secret:
             lpath = path.split('/')
             path = '/'.join(lpath[0:-1])
@@ -281,7 +282,7 @@ class VaultPass(object):
         # We need to recurse down and delete secrets. Empty subdirs are removed automatically.
         if op == 'destroy':
             if mtype == 'kv2':
-                versions = self.client.secrets.kv.v2.
+                pass  # TODO: how tf do i recurse
         return(handler(**args))
 
     def editSecret(self, path, mount, editor_prog = constants.EDITOR, *args, **kwargs):
