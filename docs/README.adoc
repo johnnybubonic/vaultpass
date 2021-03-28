@@ -1,6 +1,6 @@
 = VaultPass User Manual
 Brent Saner <bts@square-r00t.net>
-v1.0, 2020-03-28
+v1.0, {docdatetime}
 :doctype: book
 :data-uri:
 :imagesdir: images
